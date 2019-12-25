@@ -255,6 +255,8 @@ namespace FilepathCheckerWPF
             allFiles.Clear();
             listOfFilesNotExist.Clear();
             listboxFilepaths.Items.Clear();
+            imageFileExistsStatus.Source = new BitmapImage(new Uri(ImageModel.ImageNotFound, UriKind.Relative));
+            imageFileReadStatus.Source = new BitmapImage(new Uri(ImageModel.ImageNotFound, UriKind.Relative));
         }
     }
 }

@@ -175,24 +175,47 @@ namespace FilepathCheckerWPF
                 // Open a SpreadsheetDocument for read-only access based on a filepath.
                 using (SpreadsheetDocument spreadsheetDocument = SpreadsheetDocument.Open(filepath, false))
                 {
-                    WorkbookPart workbookPart = spreadsheetDocument.WorkbookPart;
-                    WorksheetPart worksheetPart = workbookPart.WorksheetParts.First();
-                    SheetData sheetData = worksheetPart.Worksheet.Elements<SheetData>().First();
-
-                    int rowAmount = sheetData.Elements<Row>().Count();
+                    int sheetNo = 0; // Index 0 => sheet 1
+                    WorkbookPart workbookPart;
+                    Sheet sheet;
+                    WorksheetPart worksheetPart;
+                    SheetData sheetData;
 
                     try
                     {
-                        foreach (Row r in sheetData.Elements<Row>())
+                        workbookPart = spreadsheetDocument.WorkbookPart;
+                        sheet = workbookPart.Workbook
+                         .Descendants<Sheet>()
+                         .ElementAt(sheetNo);
+                        worksheetPart = (WorksheetPart)(workbookPart.GetPartById(sheet.Id));
+                        sheetData = worksheetPart.Worksheet.Elements<SheetData>().First();
+                    }
+                    catch (Exception)
+                    {
+                        throw;
+                    }
+
+                    List<Row> rows = sheetData.Elements<Row>().ToList();
+                    int rowAmount = rows.Count;
+                    int rowCounter = 1;
+
+                    try
+                    {
+                        foreach (Row row in rows)
                         {
                             parallelOptions.CancellationToken.ThrowIfCancellationRequested();
 
-                            OpenXmlElementList elements = r.ChildElements;
-                            foreach (Cell cell in elements)
+                            // Gets all cell elements from the row
+                            List<Cell> cells = row.Elements<Cell>().ToList();
+
+                            foreach (Cell cell in cells)
                             {
+                                // If cell's datatype is text
+                                // If column letter (cell reference) equals the user specified column 
+                                // If cell is not on the first row (usually a title row)
                                 if (cell.DataType != null
                                     && cell.DataType == CellValues.SharedString
-                                    && cell.CellReference.InnerText.Contains(columnCharacter)
+                                    && cell.CellReference.InnerText.Equals(String.Join("",columnCharacter,rowCounter))
                                     && cell.CellReference.InnerText != columnCharacter + "1") // Exclude headings
                                 {
                                     //it's a shared string so use the cell inner text as the index into the 
@@ -202,25 +225,32 @@ namespace FilepathCheckerWPF
                                         .Elements<SharedStringItem>()
                                         .ElementAt(stringId).InnerText;
 
+                                    // If cell is empty, move on to the next row.
+                                    if (string.IsNullOrWhiteSpace(cellValue))
+                                        break;
+
                                     // Get filepaths in the cell
                                     // filepaths may be sepratated by a pipe character
                                     foreach (string path in cellValue.Split('|').ToList())
                                     {
                                         filepaths.Add(path);
                                     }
-                                }
 
-                                // Report progress after every row
-                                report.Filepaths = filepaths;
-                                report.PercentageCompleted = (filepaths.Count * 100) / rowAmount;
-                                progress.Report(report);
+                                    break; // No need to check other cells, move on to the next row.
+                                }
                             }
+
+                            // Report progress after each row
+                            report.Filepaths = filepaths;
+                            report.PercentageCompleted = (rowCounter * 100) / rowAmount;
+                            progress.Report(report);
+
+                            rowCounter++;
                         }
                     }
                     catch (OperationCanceledException)
                     {
-
-                        throw;
+                        return;
                     }
                 }
             }).ConfigureAwait(true);
