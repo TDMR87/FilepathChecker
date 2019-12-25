@@ -13,154 +13,16 @@ using System.Text.RegularExpressions;
 
 namespace FilepathCheckerWPF
 {
-    public static class Methods
+    public static class FileReader
     {
-        public static async Task<List<string>> GetFilepathsFromFileParallelAsync(
-            string filepath, 
-            int columnNumber,
-            IProgress<ProgressReportModelV2> progress, 
-            ParallelOptions parallelOptions)
-        {
-            List<string> filepaths = new List<string>();
-            ProgressReportModelV2 report = new ProgressReportModelV2();
-            XLWorkbook workbook = new XLWorkbook();
-            IXLWorksheet worksheet;
-
-            // Try to open excel-file
-            try
-            {
-                workbook = new XLWorkbook(filepath);
-            }
-            catch (Exception)
-            {
-                return filepaths;
-            }
-            finally
-            {
-                workbook.Dispose();
-            }
-
-            // Try to get the first sheet in the workbook
-            try
-            {
-                worksheet = workbook.Worksheets.First();
-            }
-            catch (Exception)
-            {
-                return filepaths;
-            }
-
-            await Task.Run(() =>
-            {
-                try
-                {
-                    // Iterate each row
-                    Parallel.ForEach<IXLRow>(worksheet.Rows(), parallelOptions, async (row) =>
-                    {
-                        // Cancel Parallel.ForEach()
-                        parallelOptions.CancellationToken.ThrowIfCancellationRequested();
-
-                        // Skip the title row
-                        if (row.RowNumber() == 1)
-                            return;
-
-                        // Get the cell in specified column
-                        IXLCell cell = row.Cell(columnNumber);
-
-                        // Get filepaths in the cell
-                        foreach (string path in cell.Value.ToString().Split('|').ToList())
-                        {
-                            filepaths.Add(path);
-                        }
-
-                        // Report progress
-                        report.Filepaths = filepaths;
-                        report.PercentageCompleted = (filepaths.Count * 100) / worksheet.Rows().Count();
-                        progress.Report(report);
-                    });
-                }
-                catch (OperationCanceledException ex)
-                {
-                }
-
-            }).ConfigureAwait(true);
-
-            // Return result
-            return filepaths;
-        }
-
-        public static async Task<List<string>> GetFilepathsFromFileAsync(
-            string filepath,
-            int columnNumber,
-            IProgress<ProgressReportModelV2> progress, 
-            ParallelOptions parallelOptions)
-        {
-            List<string> filepaths = new List<string>();
-            ProgressReportModelV2 report = new ProgressReportModelV2();
-            XLWorkbook workbook = new XLWorkbook();
-            IXLWorksheet worksheet;
-
-            // Try to open excel-file
-            try
-            {
-                workbook = new XLWorkbook(filepath);
-            }
-            catch (Exception)
-            {
-                return filepaths;
-            }
-            finally
-            {
-                workbook.Dispose();
-            }
-
-            // Try to get the first sheet in the workbook
-            try
-            {
-                worksheet = workbook.Worksheets.First();
-            }
-            catch (Exception)
-            {
-                return filepaths;
-            }
-
-            await Task.Run(() =>
-            {
-                try
-                {
-                    foreach (var row in worksheet.Rows())
-                    {
-                        // Cancel Parallel.ForEach()
-                        parallelOptions.CancellationToken.ThrowIfCancellationRequested();
-
-                        // Skip the title row
-                        if (row.RowNumber() == 1)
-                            continue;
-
-                        // Get the cell in specified column
-                        IXLCell cell = row.Cell(columnNumber);
-
-                        // Get filepaths in the cell
-                        foreach (string path in cell.Value.ToString().Split('|').ToList())
-                        {
-                            filepaths.Add(path);
-                        }
-
-                        // Report progress
-                        report.Filepaths = filepaths;
-                        report.PercentageCompleted = (filepaths.Count * 100) / worksheet.Rows().Count();
-                        progress.Report(report);
-                    }
-                }
-                catch (OperationCanceledException ex)
-                {
-                }
-            }).ConfigureAwait(true);
-
-            // Return result
-            return filepaths;
-        }
-
+        /// <summary>
+        /// Reads an excel file using Open XML library and extracts the values in a specific column.
+        /// </summary>
+        /// <param name="filepath"></param>
+        /// <param name="columnCharacter"></param>
+        /// <param name="progress"></param>
+        /// <param name="parallelOptions"></param>
+        /// <returns></returns>
         public static async Task<List<string>> ReadFileUsingOpenXMLAsync(
             string filepath,
             string columnCharacter,
@@ -170,6 +32,7 @@ namespace FilepathCheckerWPF
             List<string> filepaths = new List<string>();
             ProgressReportModelV2 report = new ProgressReportModelV2();
 
+            // Start a task in the background that we can cancel using the ParallelOptions cancellation token.
             await Task.Run(() =>
             {
                 // Open a SpreadsheetDocument for read-only access based on a filepath.
@@ -183,11 +46,18 @@ namespace FilepathCheckerWPF
 
                     try
                     {
+                        // Add a workbook part
                         workbookPart = spreadsheetDocument.WorkbookPart;
+
+                        // Get the first sheet
                         sheet = workbookPart.Workbook
                          .Descendants<Sheet>()
                          .ElementAt(sheetNo);
+
+                        // Add a worksheet part
                         worksheetPart = (WorksheetPart)(workbookPart.GetPartById(sheet.Id));
+
+                        // Data inside the first sheet
                         sheetData = worksheetPart.Worksheet.Elements<SheetData>().First();
                     }
                     catch (Exception)
@@ -195,14 +65,17 @@ namespace FilepathCheckerWPF
                         throw;
                     }
 
+                    // Get all the rows in the first sheet
                     List<Row> rows = sheetData.Elements<Row>().ToList();
                     int rowAmount = rows.Count;
                     int rowCounter = 1;
 
                     try
                     {
+                        // Iterate over all the rows
                         foreach (Row row in rows)
                         {
+                            // Throw if cancelled by the user
                             parallelOptions.CancellationToken.ThrowIfCancellationRequested();
 
                             // Gets all cell elements from the row
@@ -258,6 +131,13 @@ namespace FilepathCheckerWPF
             return filepaths;
         }
 
+        /// <summary>
+        /// Checks the given UNC filepath if it exists.
+        /// Returns a FileModel object and sets its FileExists property
+        /// to True or False.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
         public static async Task<FileModel> CheckFileExistsAsync(
             string path)
         {
@@ -265,31 +145,36 @@ namespace FilepathCheckerWPF
 
             await Task.Run(() =>
             {
-                string name = "";
+                string filename = "";
                 try
                 {
-                    name = System.IO.Path.GetFileName(path);
+                    filename = System.IO.Path.GetFileName(path);
                 }
                 catch (Exception)
                 {
-                    // 
+                    throw;
                 }
 
                 if (File.Exists(path))
                 {
                     file.FileExists = true;
-                    file.Filepath = $"{name}";
+                    file.Filepath = $"{filename}";
                 }
                 else
                 {
                     file.FileExists = false;
-                    file.Filepath = $"{name}";
+                    file.Filepath = $"{filename}";
                 }
             }).ConfigureAwait(true);
 
             return file;
         }
 
+        /// <summary>
+        /// Helper method for resolving column names (e.g. A,B) to their corresponding number
+        /// </summary>
+        /// <param name="columnName"></param>
+        /// <returns></returns>
         public static int ExcelColumnNameToNumber(string columnName)
         {
             if (string.IsNullOrEmpty(columnName)) throw new ArgumentNullException(nameof(columnName));

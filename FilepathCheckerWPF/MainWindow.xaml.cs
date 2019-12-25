@@ -1,18 +1,12 @@
-﻿using ClosedXML.Excel;
-using FilepathCheckerWPF.Models;
+﻿using FilepathCheckerWPF.Models;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace FilepathCheckerWPF
@@ -142,18 +136,22 @@ namespace FilepathCheckerWPF
 
             // Get filepaths from excel-file
             labelReadFileProgressStatus.Content = "Reading the file";
-            filepaths = await Methods.ReadFileUsingOpenXMLAsync(openedFile_Path, column, progress, parallelOptions).ConfigureAwait(true);
+            filepaths = await FileReader.ReadFileUsingOpenXMLAsync(
+                openedFile_Path, 
+                column, 
+                progress, 
+                parallelOptions).ConfigureAwait(true);
+
+            // File read done. Update progress bar image and label
+            imageFileReadStatus.Source = new BitmapImage(new Uri(ImageModel.ImageFound, UriKind.Relative));
+            labelFileExistsProgressStatus.Content = "Checking filepaths";
 
             // If filepaths are found, check if each file exists
             if (filepaths.Count > 0)
             {
-                // Update progress bar image and label
-                imageFileReadStatus.Source = new BitmapImage(new Uri(ImageModel.ImageFound, UriKind.Relative));
-                labelFileExistsProgressStatus.Content = "Checking filepaths";
-
                 ProgressReportModel report = new ProgressReportModel();
 
-                // Start a new task for iterating the filepaths. 
+                // Start a new task for iterating through all the filepaths. 
                 // Task is needed here so we can cancel the process by calling
                 // the cancellation token
                 await Task.Run(async() =>
@@ -167,7 +165,7 @@ namespace FilepathCheckerWPF
                             cancellationSource.Token.ThrowIfCancellationRequested();
 
                             // Gets information about the file
-                            FileModel file = await Methods.CheckFileExistsAsync(path).ConfigureAwait(true);
+                            FileModel file = await FileReader.CheckFileExistsAsync(path).ConfigureAwait(true);
 
                             // If file does not exist, add it to a list
                             if (!file.FileExists)
@@ -193,10 +191,10 @@ namespace FilepathCheckerWPF
             // Stop timing the process
             timer.Stop();
 
-            // Set progressbar image
+            // Checking if files exist is done. Set progressbar image.
             imageFileExistsStatus.Source = new BitmapImage(new Uri(ImageModel.ImageFound, UriKind.Relative));
 
-            // Results
+            // Print results to the UI
             listboxFilepaths.Items.Add(new FileModel
             {
                 Filepath = $"DONE! \n" +
@@ -209,6 +207,7 @@ namespace FilepathCheckerWPF
             listboxFilepaths.SelectedIndex = listboxFilepaths.Items.Count - 1;
             listboxFilepaths.ScrollIntoView(listboxFilepaths.SelectedItem);
 
+            // Enable/disable buttons
             buttonStart.IsEnabled = true;
             buttonStop.IsEnabled = false;
             buttonStart.Visibility = Visibility.Visible;
