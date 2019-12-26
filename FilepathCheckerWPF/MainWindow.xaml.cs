@@ -24,6 +24,7 @@ namespace FilepathCheckerWPF
 
         private static string openedFile_Path = "";
         private static string openedFile_Name = "";
+        private static string logFileUNCPath = "";
 
         public MainWindow()
         {
@@ -194,6 +195,7 @@ namespace FilepathCheckerWPF
                 }).ConfigureAwait(true);
 
                 // Close the logger
+                logFileUNCPath = CsvLogger.GetLogFileUNCPath();
                 logger.Close(); 
                 logger.Dispose();
             }
@@ -211,6 +213,11 @@ namespace FilepathCheckerWPF
                 $"Time elapsed: {timer.Elapsed} ms.\n" +
                 $"Filepaths checked: {filepaths.Count}\n" +
                 $"Missing files: {listOfFilesNotExist.Count}"
+            });
+
+            listboxFilepaths.Items.Add(new FileModel
+            {
+                Filepath = $"Log file has been created in:\n {logFileUNCPath}"
             });
 
             // Go to the last item in the listbox

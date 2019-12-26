@@ -37,22 +37,10 @@ namespace FilepathCheckerWPF
                 {
                     spreadsheetDocument = SpreadsheetDocument.Open(filepath, false);
                 }
-                catch (OpenXmlPackageException ex)
-                {
-                    filepaths.Add(ex.Message);
-                    return;
-                }
-                catch (ArgumentException ex)
-                {
-                    filepaths.Add(ex.Message);
-                    return;
-                }
-                catch (IOException ex)
-                {
-                    filepaths.Add(ex.Message);
-                    return;
-                }
-                catch (FileFormatException ex)
+                catch(Exception ex) when (ex is OpenXmlPackageException
+                                        || ex is ArgumentException
+                                        || ex is IOException
+                                        || ex is FileFormatException)
                 {
                     filepaths.Add(ex.Message);
                     return;
@@ -102,6 +90,8 @@ namespace FilepathCheckerWPF
                         string cellValue = workbookPart.SharedStringTablePart.SharedStringTable
                             .Elements<SharedStringItem>()
                             .ElementAt(stringId).InnerText;
+
+                        if (string.IsNullOrWhiteSpace(cellValue)) { continue; }
 
                         // Get filepath values in the cell value
                         // filepaths may be separated with a pipe character

@@ -42,5 +42,10 @@ namespace FilepathCheckerWPF.Methods
             // Flushing the buffer after each write makes sense in theory
             // but it made the application four times slower..
         }
+
+        public static string GetLogFileUNCPath()
+        {
+            return Path.Combine(_filepath, _filename);
+        }
     }
 }
