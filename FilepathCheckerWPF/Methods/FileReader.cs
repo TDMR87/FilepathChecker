@@ -1,15 +1,11 @@
-﻿using ClosedXML.Excel;
-using FilepathCheckerWPF.Models;
+﻿using FilepathCheckerWPF.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.IO.Packaging;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using System.Threading.Tasks;
-using DocumentFormat.OpenXml;
-using System.Text.RegularExpressions;
 
 namespace FilepathCheckerWPF
 {
@@ -36,95 +32,91 @@ namespace FilepathCheckerWPF
             await Task.Run(() =>
             {
                 // Open a SpreadsheetDocument for read-only access based on a filepath.
-                using (SpreadsheetDocument spreadsheetDocument = SpreadsheetDocument.Open(filepath, false))
+                SpreadsheetDocument spreadsheetDocument;
+                try
                 {
-                    int sheetNo = 0; // Index 0 => sheet 1
-                    WorkbookPart workbookPart;
-                    Sheet sheet;
-                    WorksheetPart worksheetPart;
-                    SheetData sheetData;
+                    spreadsheetDocument = SpreadsheetDocument.Open(filepath, false);
+                }
+                catch (OpenXmlPackageException ex)
+                {
+                    filepaths.Add(ex.Message);
+                    return;
+                }
+                catch (ArgumentException ex)
+                {
+                    filepaths.Add(ex.Message);
+                    return;
+                }
+                catch (IOException ex)
+                {
+                    filepaths.Add(ex.Message);
+                    return;
+                }
+                catch (FileFormatException ex)
+                {
+                    filepaths.Add(ex.Message);
+                    return;
+                }
 
+                WorkbookPart workbookPart = spreadsheetDocument.WorkbookPart;
+                Sheet sheet = workbookPart.Workbook
+                    .Descendants<Sheet>()
+                    .ElementAt(0); // Get the first sheet, index 0
+
+                WorksheetPart worksheetPart = (WorksheetPart)(workbookPart.GetPartById(sheet.Id));
+                SheetData sheetData = worksheetPart.Worksheet.Elements<SheetData>().First();
+
+                // Get all the rows in the first sheet
+                List<Row> rows = sheetData.Elements<Row>().ToList();
+                int rowAmount = rows.Count;
+                int rowCounter = 1;
+
+                // Iterate through all the rows
+                foreach (Row row in rows)
+                {
                     try
                     {
-                        // Add a workbook part
-                        workbookPart = spreadsheetDocument.WorkbookPart;
-
-                        // Get the first sheet
-                        sheet = workbookPart.Workbook
-                         .Descendants<Sheet>()
-                         .ElementAt(sheetNo);
-
-                        // Add a worksheet part
-                        worksheetPart = (WorksheetPart)(workbookPart.GetPartById(sheet.Id));
-
-                        // Data inside the first sheet
-                        sheetData = worksheetPart.Worksheet.Elements<SheetData>().First();
-                    }
-                    catch (Exception)
-                    {
-                        throw;
-                    }
-
-                    // Get all the rows in the first sheet
-                    List<Row> rows = sheetData.Elements<Row>().ToList();
-                    int rowAmount = rows.Count;
-                    int rowCounter = 1;
-
-                    try
-                    {
-                        // Iterate over all the rows
-                        foreach (Row row in rows)
-                        {
-                            // Throw if cancelled by the user
-                            parallelOptions.CancellationToken.ThrowIfCancellationRequested();
-
-                            // Gets all cell elements from the row
-                            List<Cell> cells = row.Elements<Cell>().ToList();
-
-                            foreach (Cell cell in cells)
-                            {
-                                // If cell's datatype is text
-                                // If column letter (cell reference) equals the user specified column 
-                                // If cell is not on the first row (usually a title row)
-                                if (cell.DataType != null
-                                    && cell.DataType == CellValues.SharedString
-                                    && cell.CellReference.InnerText.Equals(String.Join("",columnCharacter,rowCounter))
-                                    && cell.CellReference.InnerText != columnCharacter + "1") // Exclude headings
-                                {
-                                    //it's a shared string so use the cell inner text as the index into the 
-                                    //shared strings table
-                                    var stringId = Convert.ToInt32(cell.InnerText);
-                                    string cellValue = workbookPart.SharedStringTablePart.SharedStringTable
-                                        .Elements<SharedStringItem>()
-                                        .ElementAt(stringId).InnerText;
-
-                                    // If cell is empty, move on to the next row.
-                                    if (string.IsNullOrWhiteSpace(cellValue))
-                                        break;
-
-                                    // Get filepaths in the cell
-                                    // filepaths may be sepratated by a pipe character
-                                    foreach (string path in cellValue.Split('|').ToList())
-                                    {
-                                        filepaths.Add(path);
-                                    }
-
-                                    break; // No need to check other cells, move on to the next row.
-                                }
-                            }
-
-                            // Report progress after each row
-                            report.Filepaths = filepaths;
-                            report.PercentageCompleted = (rowCounter * 100) / rowAmount;
-                            progress.Report(report);
-
-                            rowCounter++;
-                        }
+                        parallelOptions.CancellationToken.ThrowIfCancellationRequested();
                     }
                     catch (OperationCanceledException)
                     {
                         return;
                     }
+
+                    string column = string.Join("", columnCharacter, rowCounter);
+
+                    // Get all cell elements from the row that belong to the specified column
+                    // and are of correct datatype
+                    List<Cell> cells = row.Elements<Cell>().Where(cell => 
+                        cell.DataType != null 
+                        && cell.DataType == CellValues.SharedString
+                        && cell.CellReference.InnerText.Equals(column, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+
+                    // Iterate through the cells in the current row
+                    foreach (Cell cell in cells)
+                    {
+                        // The cell value is a shared string so use the cell's inner text as the index into the 
+                        // shared strings table
+                        int stringId = Convert.ToInt32(cell.InnerText);
+                        string cellValue = workbookPart.SharedStringTablePart.SharedStringTable
+                            .Elements<SharedStringItem>()
+                            .ElementAt(stringId).InnerText;
+
+                        // Get filepath values in the cell value
+                        // filepaths may be separated with a pipe character
+                        foreach (string path in cellValue.Split('|').ToList())
+                        {
+                            filepaths.Add(path);
+                        }
+                    }
+
+                    // Report progress after each row
+                    report.Filepaths = filepaths;
+                    report.PercentageCompleted = (rowCounter * 100) / rowAmount;
+                    progress.Report(report);
+
+                    rowCounter++;
                 }
             }).ConfigureAwait(true);
 

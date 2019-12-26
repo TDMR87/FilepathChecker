@@ -1,4 +1,5 @@
-﻿using FilepathCheckerWPF.Models;
+﻿using FilepathCheckerWPF.Methods;
+using FilepathCheckerWPF.Models;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -19,9 +20,8 @@ namespace FilepathCheckerWPF
         private static CancellationTokenSource cancellationSource = new CancellationTokenSource();
         private static List<string> filepaths = new List<string>();
         private static List<FileModel> allFiles = new List<FileModel>();
-        private ObservableCollection<FileModel> listOfFilesNotExist = new ObservableCollection<FileModel>();
+        private static List<FileModel> listOfFilesNotExist = new List<FileModel>();
 
-        private static string applicationRoot = AppDomain.CurrentDomain.BaseDirectory;
         private static string openedFile_Path = "";
         private static string openedFile_Name = "";
 
@@ -150,6 +150,7 @@ namespace FilepathCheckerWPF
             if (filepaths.Count > 0)
             {
                 ProgressReportModel report = new ProgressReportModel();
+                CsvLogger logger = new CsvLogger();
 
                 // Start a new task for iterating through all the filepaths. 
                 // Task is needed here so we can cancel the process by calling
@@ -169,7 +170,12 @@ namespace FilepathCheckerWPF
 
                             // If file does not exist, add it to a list
                             if (!file.FileExists)
+                            {
                                 listOfFilesNotExist.Add(file);
+
+                                // Log it
+                                await logger.WriteLineAsync(path).ConfigureAwait(true);
+                            }
 
                             allFiles.Add(file);
 
@@ -186,6 +192,10 @@ namespace FilepathCheckerWPF
                     }
                     
                 }).ConfigureAwait(true);
+
+                // Close the logger
+                logger.Close(); 
+                logger.Dispose();
             }
 
             // Stop timing the process
