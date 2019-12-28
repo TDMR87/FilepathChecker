@@ -60,6 +60,7 @@
         <TextBox 
             Grid.Row="1" 
             Name="textboxSelectedColumn"
+            MaxLength="3"
             Height="20" 
             TextWrapping="Wrap" 
             Text="" 

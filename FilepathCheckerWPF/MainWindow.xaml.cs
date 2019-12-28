@@ -16,13 +16,14 @@ namespace FilepathCheckerWPF
     public partial class MainWindow : Window
     {
         private static CancellationTokenSource cancellationSource = new CancellationTokenSource();
-        private static List<string> filepaths = new List<string>();
-        private static List<IFileModel> allFiles = new List<IFileModel>();
+        private static List<string> allFilepaths = new List<string>();
         private static List<IFileModel> listOfFilesNotExist = new List<IFileModel>();
 
         private static string openedFile_Path = "";
         private static string openedFile_Name = "";
         private static string logFileUNCPath = "";
+
+        private static int processedFilesCount = 0;
 
         public MainWindow()
         {
@@ -80,9 +81,7 @@ namespace FilepathCheckerWPF
             }
             finally
             {
-                // Reset the application state
-                AppReset();
-
+                // Update UI buttons
                 buttonStart.IsEnabled = true;
                 buttonStop.IsEnabled = false;
                 buttonStart.Visibility = Visibility.Visible;
@@ -98,28 +97,29 @@ namespace FilepathCheckerWPF
         /// <param name="e"></param>
         private async void Start_Clicked(object sender, RoutedEventArgs e)
         {
-            // Reset the collection for storing the filepaths
+            // Reset the application state and progress bars first, 
+            // so that we are not using any previous data
             AppReset();
             progressBar1.Value = 0;
             progressBar2.Value = 0;
 
-            // Input sanity
+            // Input sanitation check
             if (String.IsNullOrWhiteSpace(textboxSelectedColumn.Text))
             {
                 MessageBox.Show("Please specify a column.");
                 return;
             }
 
-            // Get the excel column letter
-            string column = textboxSelectedColumn.Text.ToUpper();
+            // Get the user-specified column letter
+            string column = textboxSelectedColumn.Text.ToUpper(System.Globalization.CultureInfo.InvariantCulture);
 
-            // Update UI
+            // Update UI buttons
             buttonStart.IsEnabled = false;
             buttonStop.IsEnabled = true;
             buttonStart.Visibility = Visibility.Hidden;
             buttonStop.Visibility = Visibility.Visible;
 
-            // Objects for transferring information about the progress of the ongoing process
+            // Objects for transferring information about the progress of the ongoing tasks
             Progress<ProgressReportModelV2> progress = new Progress<ProgressReportModelV2>();
             Progress<ProgressReportModel> checkExistsProgress = new Progress<ProgressReportModel>();
             progress.ProgressChanged += UpdateProgressBar1;
@@ -133,9 +133,12 @@ namespace FilepathCheckerWPF
             // Start timing
             Stopwatch timer = Stopwatch.StartNew();
 
-            // Get filepaths from excel-file
+            // Update progress bar label
             labelReadFileProgressStatus.Content = "Reading the file";
-            filepaths = await FileReader.ReadFileUsingOpenXMLAsync(
+
+            // Start a task of opening the excel-file and start reading the filepaths from the user-specified column
+            // Extracts the filepaths into a collection
+            allFilepaths = await FileReader.ReadFileUsingOpenXMLAsync(
                 openedFile_Path, 
                 column, 
                 progress, 
@@ -145,9 +148,10 @@ namespace FilepathCheckerWPF
             imageFileReadStatus.Source = new BitmapImage(new Uri(ImageModel.ImageFound, UriKind.Relative));
             labelFileExistsProgressStatus.Content = "Checking filepaths";
 
-            // If filepaths are found, check if each file exists
-            if (filepaths.Count > 0)
+            // If any filepaths are found, check each filepath if it exists
+            if (allFilepaths.Count > 0)
             {
+                // Progress bar and logger objects
                 ProgressReportModel report = new ProgressReportModel();
                 CsvLogger logger = new CsvLogger();
 
@@ -158,13 +162,16 @@ namespace FilepathCheckerWPF
                 {
                     try
                     {
-                        foreach (string path in filepaths)
+                        foreach (string path in allFilepaths)
                         {
+                            // Ignore possible empty paths
                             if (String.IsNullOrWhiteSpace(path)) { continue; }
 
+                            // Cancel if user presses Stop
                             cancellationSource.Token.ThrowIfCancellationRequested();
 
-                            // Gets information about the file
+                            // Wrap each filepath into a IFileModel object
+                            // Sets the object's FileExists-property to true/false
                             IFileModel file = await FileReader.CheckFileModelExistsAsync(path).ConfigureAwait(true);
 
                             // If file does not exist, add it to a list
@@ -176,12 +183,11 @@ namespace FilepathCheckerWPF
                                 await logger.WriteLineAsync(path).ConfigureAwait(true);
                             }
 
-                            allFiles.Add(file);
+                            // Increment the count of processed filepaths for updating the progress bar
+                            processedFilesCount++;
 
-                            // Report progress
-                            report.FilesChecked = allFiles;
-                            report.PercentageCompleted = (allFiles.Count * 100) / filepaths.Count;
-
+                            // Report progress after each processed filepath
+                            report.PercentageCompleted = (processedFilesCount * 100) / allFilepaths.Count;
                             SendProgressReport(checkExistsProgress, report);
                         }
                     }
@@ -201,7 +207,7 @@ namespace FilepathCheckerWPF
             // Stop timing the process
             timer.Stop();
 
-            // Checking if files exist is done. Set progressbar image.
+            // Filepaths checking is finished or stopped. Set progressbar image.
             imageFileExistsStatus.Source = new BitmapImage(new Uri(ImageModel.ImageFound, UriKind.Relative));
 
             // Print results to the UI
@@ -209,10 +215,11 @@ namespace FilepathCheckerWPF
             {
                 Filepath = $"DONE! \n" +
                 $"Time elapsed: {timer.Elapsed} ms.\n" +
-                $"Filepaths checked: {filepaths.Count}\n" +
+                $"Filepaths checked: {allFilepaths.Count}\n" +
                 $"Missing files: {listOfFilesNotExist.Count}"
             });
 
+            // Print the location of the log file
             listboxFilepaths.Items.Add(new FileModel
             {
                 Filepath = $"Log file has been created in:\n {logFileUNCPath}"
@@ -222,7 +229,7 @@ namespace FilepathCheckerWPF
             listboxFilepaths.SelectedIndex = listboxFilepaths.Items.Count - 1;
             listboxFilepaths.ScrollIntoView(listboxFilepaths.SelectedItem);
 
-            // Enable/disable buttons
+            // Enable/disable UI buttons
             buttonStart.IsEnabled = true;
             buttonStop.IsEnabled = false;
             buttonStart.Visibility = Visibility.Visible;
@@ -260,15 +267,15 @@ namespace FilepathCheckerWPF
         }
 
         /// <summary>
-        /// Sets the state of the application to 
+        /// Reset the state of the application
         /// </summary>
         private void AppReset()
         {
             cancellationSource = new CancellationTokenSource();
-            filepaths.Clear();
-            allFiles.Clear();
+            allFilepaths.Clear();
             listOfFilesNotExist.Clear();
             listboxFilepaths.Items.Clear();
+            processedFilesCount = 0;
             imageFileExistsStatus.Source = new BitmapImage(new Uri(ImageModel.ImageNotFound, UriKind.Relative));
             imageFileReadStatus.Source = new BitmapImage(new Uri(ImageModel.ImageNotFound, UriKind.Relative));
         }

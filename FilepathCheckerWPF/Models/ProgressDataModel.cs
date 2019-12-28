@@ -9,7 +9,6 @@ namespace FilepathCheckerWPF
     // Progress model for reporting progress of iterating through IFileModel-objects
     public class ProgressReportModel
     {
-        public List<IFileModel> FilesChecked { get; set; } = new List<IFileModel>();
         public int PercentageCompleted { get; set; } = 0;
     }
 
