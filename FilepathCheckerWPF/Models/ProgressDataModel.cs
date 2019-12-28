@@ -4,14 +4,16 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FilepathCheckerWPF.Models
+namespace FilepathCheckerWPF
 {
+    // Progress model for reporting progress of iterating through IFileModel-objects
     public class ProgressReportModel
     {
-        public List<FileModel> FilesChecked { get; set; } = new List<FileModel>();
+        public List<IFileModel> FilesChecked { get; set; } = new List<IFileModel>();
         public int PercentageCompleted { get; set; } = 0;
     }
 
+    // Progress model for reporting progress of reading text-type filepaths from excel-file
     public class ProgressReportModelV2
     {
         public List<string> Filepaths { get; set; } = new List<string>();

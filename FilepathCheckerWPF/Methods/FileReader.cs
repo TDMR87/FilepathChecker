@@ -1,5 +1,4 @@
-﻿using FilepathCheckerWPF.Models;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -120,17 +119,18 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static async Task<FileModel> CheckFileExistsAsync(
+        public static async Task<IFileModel> CheckFileModelExistsAsync(
             string path)
         {
             FileModel file = new FileModel();
 
+            // Create an instance of FileModel and check if file exists
             await Task.Run(() =>
             {
-                string filename = "";
+                string filepath = "";
                 try
                 {
-                    filename = System.IO.Path.GetFileName(path);
+                    filepath = System.IO.Path.GetFileName(path);
                 }
                 catch (Exception)
                 {
@@ -140,12 +140,12 @@ namespace FilepathCheckerWPF
                 if (File.Exists(path))
                 {
                     file.FileExists = true;
-                    file.Filepath = $"{filename}";
+                    file.Filepath = $"{filepath}";
                 }
                 else
                 {
                     file.FileExists = false;
-                    file.Filepath = $"{filename}";
+                    file.Filepath = $"{filepath}";
                 }
             }).ConfigureAwait(true);
 

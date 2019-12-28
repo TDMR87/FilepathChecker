@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FilepathCheckerWPF.Methods
+namespace FilepathCheckerWPF
 {
     // Use sealed so you can use the "easier" dispose pattern, if it is not sealed
     // you should create a `protected virtual void Dispose(bool disposing)` method.

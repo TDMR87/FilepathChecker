@@ -1,6 +1,4 @@
-﻿using FilepathCheckerWPF.Methods;
-using FilepathCheckerWPF.Models;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -19,8 +17,8 @@ namespace FilepathCheckerWPF
     {
         private static CancellationTokenSource cancellationSource = new CancellationTokenSource();
         private static List<string> filepaths = new List<string>();
-        private static List<FileModel> allFiles = new List<FileModel>();
-        private static List<FileModel> listOfFilesNotExist = new List<FileModel>();
+        private static List<IFileModel> allFiles = new List<IFileModel>();
+        private static List<IFileModel> listOfFilesNotExist = new List<IFileModel>();
 
         private static string openedFile_Path = "";
         private static string openedFile_Name = "";
@@ -167,7 +165,7 @@ namespace FilepathCheckerWPF
                             cancellationSource.Token.ThrowIfCancellationRequested();
 
                             // Gets information about the file
-                            FileModel file = await FileReader.CheckFileExistsAsync(path).ConfigureAwait(true);
+                            IFileModel file = await FileReader.CheckFileModelExistsAsync(path).ConfigureAwait(true);
 
                             // If file does not exist, add it to a list
                             if (!file.FileExists)

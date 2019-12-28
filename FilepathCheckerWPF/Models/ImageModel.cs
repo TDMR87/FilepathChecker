@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace FilepathCheckerWPF.Models
+namespace FilepathCheckerWPF
 {
     public static class ImageModel
     {

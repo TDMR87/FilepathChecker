@@ -90,6 +90,7 @@
     </ApplicationDefinition>
     <Compile Include="Methods\FileReader.cs" />
     <Compile Include="Methods\CsvLogger.cs" />
+    <Compile Include="Models\IFileModel.cs" />
     <Compile Include="Models\ProgressDataModel.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
