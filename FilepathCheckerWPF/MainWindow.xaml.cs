@@ -199,7 +199,7 @@ namespace FilepathCheckerWPF
                 }).ConfigureAwait(true);
 
                 // Close the logger
-                logFileUNCPath = CsvLogger.GetLogFileUNCPath();
+                logFileUNCPath = CsvLogger.GetPath();
                 logger.Close(); 
                 logger.Dispose();
             }

@@ -11,7 +11,7 @@ namespace FilepathCheckerWPF
     public static class FileReader
     {
         /// <summary>
-        /// Reads an excel file using Open XML library and extracts the values in a specific column.
+        /// Opens an excel file from the provided filepath using Open XML library. Extracts all the values from the specified column.
         /// </summary>
         /// <param name="filepath"></param>
         /// <param name="columnCharacter"></param>
@@ -70,6 +70,8 @@ namespace FilepathCheckerWPF
                         return;
                     }
 
+                    // Concatenates the specified column character with the current row.
+                    // e.g A1, A2, A3 and so on...
                     string column = string.Join("", columnCharacter, rowCounter);
 
                     // Get all cell elements from the row that belong to the specified column
@@ -113,9 +115,8 @@ namespace FilepathCheckerWPF
         }
 
         /// <summary>
-        /// Checks the given UNC filepath if it exists.
-        /// Returns a FileModel object and sets its FileExists property
-        /// to True or False.
+        /// Checks the given UNC filepath and returns a FileModel object. The FileExists property
+        /// will be set to True or False depending if the provided filepath exists or not.
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
@@ -153,7 +154,7 @@ namespace FilepathCheckerWPF
         }
 
         /// <summary>
-        /// Helper method for resolving column names (e.g. A,B) to their corresponding number
+        /// Resolves column names (e.g. A) to their corresponding number (A = 1)
         /// </summary>
         /// <param name="columnName"></param>
         /// <returns></returns>
