@@ -110,7 +110,7 @@
         </ListBox>
 
         <Label 
-            Name="labelReadFileProgressStatus"
+            Name="labelProgressBar1"
             Content="" 
             HorizontalAlignment="Left" 
             VerticalAlignment="Top" 
@@ -118,7 +118,7 @@
             Grid.Row="2"/>
 
         <Label 
-            Name="labelFileExistsProgressStatus"
+            Name="labelProgressBar2"
             Content="" 
             HorizontalAlignment="Left" 
             VerticalAlignment="Top" 

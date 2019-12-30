@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace FilepathCheckerWPF
@@ -30,7 +27,7 @@ namespace FilepathCheckerWPF
         }
 
         /// <summary>
-        /// Writes a line to the log file instance asynchronously.
+        /// Writes a line to the log file asynchronously.
         /// </summary>
         /// <param name="line"></param>
         /// <returns></returns>
@@ -38,6 +35,20 @@ namespace FilepathCheckerWPF
         {
             await writer.WriteLineAsync($"File not found;{line}")
                 .ConfigureAwait(true);
+
+            // Not flushing here.
+            // Flushing the buffer after each write makes sense in theory
+            // but it made the application much slower..
+        }
+
+        /// <summary>
+        /// Writes a line to the log file synchronously.
+        /// </summary>
+        /// <param name="line"></param>
+        /// <returns></returns>
+        public void WriteLine(string line)
+        {
+            writer.WriteLineAsync($"File not found;{line}");
 
             // Not flushing here.
             // Flushing the buffer after each write makes sense in theory
@@ -62,7 +73,5 @@ namespace FilepathCheckerWPF
         {
             writer.Dispose();
         }
-
-        
     }
 }

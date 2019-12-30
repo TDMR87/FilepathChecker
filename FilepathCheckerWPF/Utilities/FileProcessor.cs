@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace FilepathCheckerWPF
 {
-    public static class FileReader
+    public static class FileProcessor
     {
         /// <summary>
         /// Opens an excel file from the provided filepath using Open XML library. Extracts all the values from the specified column.
@@ -114,13 +114,57 @@ namespace FilepathCheckerWPF
             return filepaths;
         }
 
+        public static async Task<List<IFileModel>> ProcessFilepaths(List<string> filepaths, IProgress<ProgressReportModel> progress, ParallelOptions parallelOptions)
+        {
+            List<IFileModel> output = new List<IFileModel>();
+            ProgressReportModel report = new ProgressReportModel();
+            CsvLogger logger = new CsvLogger();
+
+            await Task.Run(async () =>
+            {
+                foreach (string path in filepaths)
+                {
+                    // Cancel if user presses Stop
+                    try
+                    {
+                        parallelOptions.CancellationToken.ThrowIfCancellationRequested();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+
+                    // Wrap each filepath into a IFileModel object
+                    IFileModel file = FileProcessor.CreateFileModel(path);
+
+                    // Add the processed file to the output collection
+                    output.Add((FileModel)file);
+
+                    // If file does not exist, log the filepath.
+                    if (file.FileExists == false)
+                        logger.WriteLine(file.Filepath);
+
+                    // Report progress after each processed filepath
+                    report.FilesProcessed = output;
+                    report.PercentageCompleted = (output.Count * 100) / filepaths.Count;
+                    progress.Report(report);
+                }
+            }).ConfigureAwait(true);
+
+            // Close the logger
+            logger.Close();
+            logger.Dispose();
+
+            return output;
+        }
+
         /// <summary>
         /// Checks the given UNC filepath and returns a FileModel object. The FileExists property
         /// will be set to True or False depending if the provided filepath exists or not.
         /// </summary>
         /// <param name="path"></param>
         /// <returns></returns>
-        public static async Task<IFileModel> CheckFileModelExistsAsync(
+        public static async Task<IFileModel> CreateFileModelAsync(
             string path)
         {
             FileModel file = new FileModel();
@@ -149,6 +193,41 @@ namespace FilepathCheckerWPF
                     file.Filepath = $"{filepath}";
                 }
             }).ConfigureAwait(true);
+
+            return file;
+        }
+
+        /// <summary>
+        /// Checks the given UNC filepath and returns a FileModel object. The FileExists property
+        /// will be set to True or False depending if the provided filepath exists or not.
+        /// </summary>
+        /// <param name="path"></param>
+        /// <returns></returns>
+        public static IFileModel CreateFileModel(
+            string path)
+        {
+            FileModel file = new FileModel();
+
+            string filepath = "";
+            try
+            {
+                filepath = System.IO.Path.GetFileName(path);
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+
+            if (File.Exists(path))
+            {
+                file.FileExists = true;
+                file.Filepath = $"{filepath}";
+            }
+            else
+            {
+                file.FileExists = false;
+                file.Filepath = $"{filepath}";
+            }
 
             return file;
         }

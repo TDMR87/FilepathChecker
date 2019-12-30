@@ -88,8 +88,8 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="StaticMethods\FileReader.cs" />
-    <Compile Include="StaticMethods\CsvLogger.cs" />
+    <Compile Include="Utilities\FileProcessor.cs" />
+    <Compile Include="Utilities\CsvLogger.cs" />
     <Compile Include="Models\IFileModel.cs" />
     <Compile Include="Models\ProgressDataModel.cs" />
     <Page Include="MainWindow.xaml">
