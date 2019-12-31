@@ -62,16 +62,16 @@ namespace FilepathCheckerWPF
             }
             catch (ObjectDisposedException ex)
             {
-                listboxFilepaths.Items.Add(new FileModel
+                listboxResultsWindow.Items.Add(new ResultMessage
                 {
-                    Filepath = ex.Message
+                    Content = ex.Message
                 });
             }
             catch (AggregateException ex)
             {
-                listboxFilepaths.Items.Add(new FileModel
+                listboxResultsWindow.Items.Add(new ResultMessage
                 {
-                    Filepath = ex.Message
+                    Content = ex.Message
                 });
             }
             finally
@@ -158,18 +158,18 @@ namespace FilepathCheckerWPF
             int missing = processedFiles.Where(file => !file.FileExists).Count();
 
             // Print results to the UI
-            listboxFilepaths.Items.Add(new FileModel
+            listboxResultsWindow.Items.Add(new ResultMessage
             {
-                Filepath = $"DONE! \n" +
+                Content = $"DONE! \n" +
                 $"Time elapsed: {timer.Elapsed} ms.\n" +
                 $"Filepaths checked: {filepaths.Count}\n" +
-                $"Missing files: {missing}" + 
-                $"Check the log file in the application folder."
+                $"Missing files: {missing} \n" + 
+                $"Log file has been created in the application folder."
             });
 
             // Go to the last item in the listbox
-            listboxFilepaths.SelectedIndex = listboxFilepaths.Items.Count - 1;
-            listboxFilepaths.ScrollIntoView(listboxFilepaths.SelectedItem);
+            listboxResultsWindow.SelectedIndex = listboxResultsWindow.Items.Count - 1;
+            listboxResultsWindow.ScrollIntoView(listboxResultsWindow.SelectedItem);
 
             // Enable/disable UI buttons
             buttonStart.IsEnabled = true;
@@ -205,7 +205,7 @@ namespace FilepathCheckerWPF
         {
             cancellationSource = new CancellationTokenSource();
 
-            listboxFilepaths.Items.Clear();
+            listboxResultsWindow.Items.Clear();
             labelProgressBar1.Content = "";
             labelProgressBar2.Content = "";
 

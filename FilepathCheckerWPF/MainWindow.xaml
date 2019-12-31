@@ -90,7 +90,7 @@
             Height="20" Margin="132,10.6,26.2,11.8"/>
 
         <ListBox
-            x:Name="listboxFilepaths" 
+            x:Name="listboxResultsWindow" 
             HorizontalAlignment="Center" 
             Height="230" 
             Width="399"
@@ -101,8 +101,7 @@
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
-                        <Image Source="{Binding Imagepath}" Width="12" Height="12" />
-                        <TextBlock Text="{Binding Filepath}"/>
+                        <TextBlock Text="{Binding Content}"/>
                     </StackPanel>
                 </DataTemplate>
             </ListBox.ItemTemplate>

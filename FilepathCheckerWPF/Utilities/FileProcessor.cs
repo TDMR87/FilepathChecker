@@ -5,6 +5,7 @@ using System.Linq;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using System.Threading.Tasks;
+using System.Globalization;
 
 namespace FilepathCheckerWPF
 {
@@ -70,28 +71,30 @@ namespace FilepathCheckerWPF
                         return;
                     }
 
-                    // Concatenates the specified column character with the current row.
+                    // Set the cell name we are looking for in each row.
+                    // Concatenates the specified column character with the current row number.
                     // e.g A1, A2, A3 and so on...
-                    string column = string.Join("", columnCharacter, rowCounter);
+                    string cellName = string.Join("", columnCharacter, rowCounter);
 
                     // Get all cell elements from the row that belong to the specified column
                     // and are of correct datatype
                     List<Cell> cells = row.Elements<Cell>().Where(cell => 
-                        cell.DataType != null 
-                        && cell.DataType == CellValues.SharedString
-                        && cell.CellReference.InnerText.Equals(column, StringComparison.OrdinalIgnoreCase))
-                        .ToList();
+                                cell.DataType != null 
+                                && cell.DataType == CellValues.SharedString
+                                && cell.CellReference.InnerText.Equals(cellName, StringComparison.OrdinalIgnoreCase))
+                                .ToList();
 
-                    // Iterate through the cells in the current row
+                    // Iterate through the cells
                     foreach (Cell cell in cells)
                     {
                         // The cell value is a shared string so use the cell's inner text as the index into the 
                         // shared strings table
-                        int stringId = Convert.ToInt32(cell.InnerText);
+                        int stringId = Convert.ToInt32(cell.InnerText, CultureInfo.InvariantCulture);
                         string cellValue = workbookPart.SharedStringTablePart.SharedStringTable
                             .Elements<SharedStringItem>()
                             .ElementAt(stringId).InnerText;
 
+                        // If cell is empty, continue to the next row.
                         if (string.IsNullOrWhiteSpace(cellValue)) { continue; }
 
                         // Get filepath values in the cell value
@@ -109,18 +112,26 @@ namespace FilepathCheckerWPF
 
                     rowCounter++;
                 }
-            }).ConfigureAwait(true);
+            }).ConfigureAwait(false);
 
             return filepaths;
         }
 
+        /// <summary>
+        /// Takes a list of filepaths and wraps each filepath into an IFileModel object. 
+        /// Returns the objects as a List.
+        /// </summary>
+        /// <param name="filepaths"></param>
+        /// <param name="progress"></param>
+        /// <param name="parallelOptions"></param>
+        /// <returns></returns>
         public static async Task<List<IFileModel>> ProcessFilepaths(List<string> filepaths, IProgress<ProgressReportModel> progress, ParallelOptions parallelOptions)
         {
             List<IFileModel> output = new List<IFileModel>();
             ProgressReportModel report = new ProgressReportModel();
             CsvLogger logger = new CsvLogger();
 
-            await Task.Run(async () =>
+            await Task.Run(() =>
             {
                 foreach (string path in filepaths)
                 {
@@ -149,7 +160,7 @@ namespace FilepathCheckerWPF
                     report.PercentageCompleted = (output.Count * 100) / filepaths.Count;
                     progress.Report(report);
                 }
-            }).ConfigureAwait(true);
+            }).ConfigureAwait(false);
 
             // Close the logger
             logger.Close();
@@ -192,7 +203,7 @@ namespace FilepathCheckerWPF
                     file.FileExists = false;
                     file.Filepath = $"{filepath}";
                 }
-            }).ConfigureAwait(true);
+            }).ConfigureAwait(false);
 
             return file;
         }

@@ -48,7 +48,7 @@ namespace FilepathCheckerWPF
         /// <returns></returns>
         public void WriteLine(string line)
         {
-            writer.WriteLineAsync($"File not found;{line}");
+            writer.WriteLine($"File not found;{line}");
 
             // Not flushing here.
             // Flushing the buffer after each write makes sense in theory
