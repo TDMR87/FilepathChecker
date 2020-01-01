@@ -88,13 +88,16 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Models\ErrorMessage.cs" />
-    <Compile Include="Models\IMessage.cs" />
-    <Compile Include="Models\ResultMessage.cs" />
+    <Compile Include="Models\Messages\ErrorMessage.cs" />
+    <Compile Include="Models\Images\Checkmark.cs" />
+    <Compile Include="Models\Images\RedCross.cs" />
+    <Compile Include="Models\Messages\IMessage.cs" />
+    <Compile Include="Models\Images\BaseImage.cs" />
+    <Compile Include="Models\Messages\ResultMessage.cs" />
     <Compile Include="Utilities\FileProcessor.cs" />
     <Compile Include="Utilities\CsvLogger.cs" />
-    <Compile Include="Models\IFileModel.cs" />
-    <Compile Include="Models\ProgressDataModel.cs" />
+    <Compile Include="Models\FileModels\IFileModel.cs" />
+    <Compile Include="Models\ProgressModels\ProgressDataModel.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -109,8 +112,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Models\FileModel.cs" />
-    <Compile Include="Models\ImageModel.cs" />
+    <Compile Include="Models\FileModels\FileModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>

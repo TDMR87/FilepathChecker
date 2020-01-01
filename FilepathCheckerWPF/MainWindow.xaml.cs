@@ -138,7 +138,7 @@ namespace FilepathCheckerWPF
                 .ConfigureAwait(true);
 
             // File read done.
-            imageFileReadStatus.Source = new BitmapImage(new Uri(ImageModel.ImageFound, UriKind.Relative));
+            imageFileReadStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
 
             // Process the filepaths and resolve them into IFileModel objects
             labelProgressBar2.Content = "Checking filepaths ...";
@@ -149,7 +149,7 @@ namespace FilepathCheckerWPF
                 .ConfigureAwait(true);
 
             // Processing done.
-            imageFileExistsStatus.Source = new BitmapImage(new Uri(ImageModel.ImageFound, UriKind.Relative));
+            imageFileExistsStatus.Source = new BitmapImage(new Uri(new RedCross().Path(), UriKind.Relative));
 
             // Stop timing
             timer.Stop();
@@ -209,8 +209,8 @@ namespace FilepathCheckerWPF
             labelProgressBar1.Content = "";
             labelProgressBar2.Content = "";
 
-            imageFileExistsStatus.Source = new BitmapImage(new Uri(ImageModel.ImageNotFound, UriKind.Relative));
-            imageFileReadStatus.Source = new BitmapImage(new Uri(ImageModel.ImageNotFound, UriKind.Relative));
+            imageFileExistsStatus.Source = new BitmapImage(new Uri(new RedCross().Path(), UriKind.Relative));
+            imageFileReadStatus.Source = new BitmapImage(new Uri(new RedCross().Path(), UriKind.Relative));
         }
     }
 }
