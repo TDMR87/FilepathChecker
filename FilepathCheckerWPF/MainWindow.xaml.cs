@@ -149,7 +149,7 @@ namespace FilepathCheckerWPF
                 .ConfigureAwait(true);
 
             // Processing done.
-            imageFileExistsStatus.Source = new BitmapImage(new Uri(new RedCross().Path(), UriKind.Relative));
+            imageFileExistsStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
 
             // Stop timing
             timer.Stop();
