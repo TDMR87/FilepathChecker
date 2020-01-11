@@ -173,36 +173,19 @@ namespace FilepathCheckerWPF
         /// Checks the given UNC filepath and returns a FileModel object. The FileExists property
         /// will be set to True or False depending if the provided filepath exists or not.
         /// </summary>
-        /// <param name="path"></param>
+        /// <param name="filepath"></param>
         /// <returns></returns>
         public static async Task<IFileModel> CreateFileModelAsync(
-            string path)
+            string filepath)
         {
             FileModel file = new FileModel();
 
             // Create an instance of FileModel and check if file exists
             await Task.Run(() =>
             {
-                string filepath = "";
-                try
-                {
-                    filepath = System.IO.Path.GetFileName(path);
-                }
-                catch (Exception)
-                {
-                    throw;
-                }
+                file.Filepath = filepath;
+                file.FileExists = File.Exists(filepath) ? true : false;
 
-                if (File.Exists(path))
-                {
-                    file.FileExists = true;
-                    file.Filepath = $"{filepath}";
-                }
-                else
-                {
-                    file.FileExists = false;
-                    file.Filepath = $"{filepath}";
-                }
             }).ConfigureAwait(false);
 
             return file;
@@ -212,33 +195,15 @@ namespace FilepathCheckerWPF
         /// Checks the given UNC filepath and returns a FileModel object. The FileExists property
         /// will be set to True or False depending if the provided filepath exists or not.
         /// </summary>
-        /// <param name="path"></param>
+        /// <param name="filepath"></param>
         /// <returns></returns>
         public static IFileModel CreateFileModel(
-            string path)
+            string filepath)
         {
             FileModel file = new FileModel();
 
-            string filepath = "";
-            try
-            {
-                filepath = System.IO.Path.GetFileName(path);
-            }
-            catch (Exception)
-            {
-                throw;
-            }
-
-            if (File.Exists(path))
-            {
-                file.FileExists = true;
-                file.Filepath = $"{filepath}";
-            }
-            else
-            {
-                file.FileExists = false;
-                file.Filepath = $"{filepath}";
-            }
+            file.Filepath = filepath;
+            file.FileExists = File.Exists(filepath) ? true : false;
 
             return file;
         }

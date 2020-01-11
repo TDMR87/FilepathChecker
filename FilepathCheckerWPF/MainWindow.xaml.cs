@@ -176,6 +176,9 @@ namespace FilepathCheckerWPF
             buttonStop.IsEnabled = false;
             buttonStart.Visibility = Visibility.Visible;
             buttonStop.Visibility = Visibility.Hidden;
+
+            // Release resources (free ram)
+            GC.Collect();
         }
 
         /// <summary>
