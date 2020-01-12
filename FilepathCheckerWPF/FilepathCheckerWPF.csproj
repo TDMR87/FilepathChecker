@@ -44,7 +44,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>filesystems_icon.ico</ApplicationIcon>
+    <ApplicationIcon>App_icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="ClosedXML, Version=0.94.2.0, Culture=neutral, processorArchitecture=MSIL">
@@ -91,31 +91,31 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="Models\Messages\ErrorMessage.cs" />
-    <Compile Include="Models\Images\Checkmark.cs" />
-    <Compile Include="Models\Images\RedCross.cs" />
-    <Compile Include="Models\Messages\IMessage.cs" />
-    <Compile Include="Models\Images\BaseImage.cs" />
-    <Compile Include="Models\Messages\ResultMessage.cs" />
+    <Compile Include="UI\GUI.xaml.cs">
+      <DependentUpon>GUI.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Models\MessageModels\ErrorMessage.cs" />
+    <Compile Include="Models\ImageModels\Checkmark.cs" />
+    <Compile Include="Models\ImageModels\RedCross.cs" />
+    <Compile Include="Interfaces\IMessage.cs" />
+    <Compile Include="Models\ImageModels\BaseImage.cs" />
+    <Compile Include="Models\MessageModels\ResultMessage.cs" />
     <Compile Include="Utilities\FileProcessor.cs" />
     <Compile Include="Utilities\CsvLogger.cs" />
-    <Compile Include="Models\FileModels\IFileModel.cs" />
+    <Compile Include="Interfaces\IFileModel.cs" />
     <Compile Include="Models\ProgressModels\ProgressDataModel.cs" />
-    <Page Include="MainWindow.xaml">
-      <Generator>MSBuild:Compile</Generator>
+    <Compile Include="Interfaces\ILogger.cs" />
+    <Page Include="UI\GUI.xaml">
       <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
     </Page>
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="MainWindow.xaml.cs">
-      <DependentUpon>MainWindow.xaml</DependentUpon>
-      <SubType>Code</SubType>
-    </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Models\FileModels\FileModel.cs" />
+    <Compile Include="Models\FileModels\FileModelV1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>
@@ -171,10 +171,7 @@
     <Analyzer Include="..\packages\Microsoft.NetFramework.Analyzers.2.9.8\analyzers\dotnet\cs\Microsoft.NetFramework.CSharp.Analyzers.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="filesystems_icon.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="Images\filesystems_icon.ico" />
+    <Resource Include="App_icon.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

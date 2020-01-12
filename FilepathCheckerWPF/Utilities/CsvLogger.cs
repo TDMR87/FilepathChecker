@@ -7,14 +7,18 @@ namespace FilepathCheckerWPF
 {
     // Use sealed so you can use the "easier" dispose pattern, if it is not sealed
     // you should create a `protected virtual void Dispose(bool disposing)` method.
-    public sealed class CsvLogger : IDisposable
+    public sealed class CsvLogger : IDisposable, ILogger
     {
-        private StreamWriter writer;
+        private StreamWriter _writer;
         private static string _fileDirectory = "";
         private static string _fileName = "";
         private static string _fileExtension = "";
         private readonly string _titleRow = "";
 
+        /// <summary>
+        /// Creates an instance of a CSV logger. 
+        /// Instanciating this class creates a log file to the application root folder and writes one initial title line to that file.
+        /// </summary>
         public CsvLogger()
         {
             _fileDirectory = AppDomain.CurrentDomain.BaseDirectory; // The application root directory
@@ -22,8 +26,8 @@ namespace FilepathCheckerWPF
             _fileExtension = ".csv";
             _titleRow = "Error;Filepath";
 
-            writer = new StreamWriter(Path.Combine(_fileDirectory, (_fileName + _fileExtension)));
-            writer.WriteLine(_titleRow);
+            _writer = new StreamWriter(Path.Combine(_fileDirectory, (_fileName + _fileExtension)));
+            _writer.WriteLine(_titleRow);
         }
 
         /// <summary>
@@ -31,9 +35,9 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="line"></param>
         /// <returns></returns>
-        public async Task WriteLineAsync(string line)
+        public async Task LogFileNotFoundAsync(string line)
         {
-            await writer.WriteLineAsync($"File not found;{line}")
+            await _writer.WriteLineAsync($"File not found;{line}")
                 .ConfigureAwait(true);
 
             // Not flushing here.
@@ -46,9 +50,9 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="line"></param>
         /// <returns></returns>
-        public void WriteLine(string line)
+        public void LogFileNotFound(string line)
         {
-            writer.WriteLine($"File not found;{line}");
+            _writer.WriteLine($"File not found;{line}");
 
             // Not flushing here.
             // Flushing the buffer after each write makes sense in theory
@@ -66,12 +70,12 @@ namespace FilepathCheckerWPF
 
         public void Close()
         {
-            writer.Close();
+            _writer.Close();
         }
 
         public void Dispose()
         {
-            writer.Dispose();
+            _writer.Dispose();
         }
     }
 }

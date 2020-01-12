@@ -10,8 +10,19 @@ using DocumentFormat.OpenXml;
 
 namespace FilepathCheckerWPF
 {
-    public static class FileProcessor
+    public class FileProcessor
     {
+        private ILogger _logger;
+        private IFileModel _fileModel;
+        private SpreadsheetDocument _spreadsheetDocument;
+
+        public FileProcessor(SpreadsheetDocument spreadsheetDocument, IFileModel fileModel, ILogger logger)
+        {
+            _logger = logger;
+            _spreadsheetDocument = spreadsheetDocument;
+            _fileModel = fileModel;
+        }
+
         /// <summary>
         /// Opens an excel file from the provided filepath using Open XML library. 
         /// Uses the DOM approach that requires loading entire Open XML parts into memory, 
@@ -22,8 +33,7 @@ namespace FilepathCheckerWPF
         /// <param name="progress"></param>
         /// <param name="parallelOptions"></param>
         /// <returns></returns>
-        public static async Task<List<string>> ReadExcelFileDOMAsync(
-            string filepath,
+        public async Task<List<string>> ReadColumnDomAsync(
             string columnCharacter,
             IProgress<ProgressReportModelV2> progress,
             ParallelOptions parallelOptions)
@@ -34,28 +44,8 @@ namespace FilepathCheckerWPF
             // Start a task in the background that we can cancel using the ParallelOptions cancellation token.
             await Task.Run(() =>
             {
-                SpreadsheetDocument spreadsheetDocument;
-                try
-                {
-                    // Open a SpreadsheetDocument in read-only mode.
-                    spreadsheetDocument = SpreadsheetDocument.Open(filepath, false);
-                }
-                catch(Exception ex) when (ex is OpenXmlPackageException
-                                        || ex is ArgumentException
-                                        || ex is IOException
-                                        || ex is FileFormatException)
-                {
-                    output.Add(ex.Message);
-                    return;
-                }
-
-                WorkbookPart workbookPart = spreadsheetDocument.WorkbookPart;
-
-                // Gets the first sheet, index 0
-                Sheet sheet = workbookPart.Workbook
-                    .Descendants<Sheet>()
-                    .ElementAt(0); 
-
+                WorkbookPart workbookPart = _spreadsheetDocument.WorkbookPart;
+                Sheet sheet = workbookPart.Workbook.Descendants<Sheet>().ElementAt(0); // Gets the first sheet, index 0
                 WorksheetPart worksheetPart = (WorksheetPart)(workbookPart.GetPartById(sheet.Id));
                 SheetData sheetData = worksheetPart.Worksheet.Elements<SheetData>().First();
 
@@ -132,8 +122,7 @@ namespace FilepathCheckerWPF
         /// <param name="progress"></param>
         /// <param name="parallelOptions"></param>
         /// <returns></returns>
-        public static async Task<List<string>> ReadExcelFileSAXAsync(
-            string filepath,
+        public async Task<List<string>> ReadColumnSaxAsync(
             string columnCharacter,
             IProgress<ProgressReportModelV2> progress,
             ParallelOptions parallelOptions)
@@ -142,31 +131,13 @@ namespace FilepathCheckerWPF
             ProgressReportModelV2 report = new ProgressReportModelV2();
 
             await Task.Run(() =>
-            {
-                SpreadsheetDocument spreadsheetDocument;
-                try
-                {
-                    // Open a SpreadsheetDocument in read-only mode.
-                    spreadsheetDocument = SpreadsheetDocument.Open(filepath, false);
-                }
-                catch (Exception ex) when (ex is OpenXmlPackageException
-                                        || ex is ArgumentException
-                                        || ex is IOException
-                                        || ex is FileFormatException)
-                {
-                    output.Add("File open error. " + ex.Message);
-                    return;
-                }
-
-                WorkbookPart workbookPart = spreadsheetDocument.WorkbookPart;
+            {           
+                WorkbookPart workbookPart = _spreadsheetDocument.WorkbookPart;
                 WorksheetPart worksheetPart = workbookPart.WorksheetParts.First();
                 OpenXmlReader reader = OpenXmlReader.Create(worksheetPart);
 
                 int totalRows = 0;
-                int currentRow = 1;
-                int sharedStringIndex;
-                string sharedStringValue;
-
+                
                 // Read the file to the end in order to calculate the amount of rows
                 while (reader.Read() && !reader.EOF)
                 {
@@ -190,6 +161,10 @@ namespace FilepathCheckerWPF
                 // Re-create the reader to start reading from the top again.
                 reader = OpenXmlReader.Create(worksheetPart);
 
+                int currentRow = 1;
+                int sharedStringIndex;
+                string sharedStringValue;
+
                 while (reader.Read())
                 {
                     // Concatenate a column name
@@ -200,24 +175,30 @@ namespace FilepathCheckerWPF
                     {
                         Cell cell = (Cell)reader.LoadCurrentElement();
 
-                        // Last condition checks that the cell is in the user specified column
+                        // If cell matches the conditions
                         if (cell.DataType != null
                             && cell.DataType == CellValues.SharedString
                             && string.IsNullOrWhiteSpace(cell.InnerText) == false
                             && cell.CellReference.InnerText.Equals(columnName, StringComparison.OrdinalIgnoreCase))
                         {
+                            // The cell value is actually an index to shared string table
                             sharedStringIndex = Convert.ToInt32(cell.InnerText, CultureInfo.InvariantCulture);
+
+                            // Get the value in the specified index from the shared string table
                             sharedStringValue = workbookPart.SharedStringTablePart.SharedStringTable
                                     .Elements<SharedStringItem>()
                                     .ElementAt(sharedStringIndex).InnerText;
 
+                            // Add the string value to to list
                             output.Add(sharedStringValue);
-                            currentRow++;
 
-                            // Report progress after each row
+                            // Report progress for progress bar in the UI
                             report.Filepaths = output;
                             report.PercentageCompleted = (currentRow * 100) / totalRows;
                             progress.Report(report);
+
+                            // We found what we wanted from the current row. Move to next row
+                            currentRow++;
                         }
 
                         try
@@ -247,11 +228,13 @@ namespace FilepathCheckerWPF
         /// <param name="progress"></param>
         /// <param name="parallelOptions"></param>
         /// <returns></returns>
-        public static async Task<List<IFileModel>> ProcessFilepaths(List<string> filepaths, IProgress<ProgressReportModel> progress, ParallelOptions parallelOptions)
+        public async Task<List<IFileModel>> ProcessFilepaths(
+            List<string> filepaths, 
+            IProgress<ProgressReportModel> progress, 
+            ParallelOptions parallelOptions)
         {
             List<IFileModel> output = new List<IFileModel>();
             ProgressReportModel report = new ProgressReportModel();
-            CsvLogger logger = new CsvLogger();
 
             await Task.Run(() =>
             {
@@ -271,11 +254,11 @@ namespace FilepathCheckerWPF
                     IFileModel file = FileProcessor.CreateFileModel(path);
 
                     // Add the processed file to the output collection
-                    output.Add((FileModel)file);
+                    output.Add(file);
 
                     // If file does not exist, log the filepath.
                     if (file.FileExists == false)
-                        logger.WriteLine(file.Filepath);
+                        _logger.LogFileNotFound(file.Filepath);
 
                     // Report progress after each processed filepath
                     report.FilesProcessed = output;
@@ -283,10 +266,6 @@ namespace FilepathCheckerWPF
                     progress.Report(report);
                 }
             }).ConfigureAwait(false);
-
-            // Close the logger
-            logger.Close();
-            logger.Dispose();
 
             return output;
         }
@@ -300,17 +279,15 @@ namespace FilepathCheckerWPF
         private static async Task<IFileModel> CreateFileModelAsync(
             string filepath)
         {
-            FileModel file = new FileModel();
-
-            // Create an instance of FileModel and check if file exists
-            await Task.Run(() =>
+            return await Task<IFileModel>.Run(() =>
             {
-                file.Filepath = filepath;
-                file.FileExists = File.Exists(filepath) ? true : false;
+                return new FileModelV1()
+                {
+                    Filepath = filepath,
+                    FileExists = File.Exists(filepath) ? true : false
+                };
 
             }).ConfigureAwait(false);
-
-            return file;
         }
 
         /// <summary>
@@ -322,16 +299,15 @@ namespace FilepathCheckerWPF
         private static IFileModel CreateFileModel(
             string filepath)
         {
-            FileModel file = new FileModel();
-
-            file.Filepath = filepath;
-            file.FileExists = File.Exists(filepath) ? true : false;
-
-            return file;
+            return new FileModelV1()
+            {
+                Filepath = filepath,
+                FileExists = File.Exists(filepath) ? true : false
+            };
         }
 
         /// <summary>
-        /// Resolves column names (e.g. A) to their corresponding number (A = 1)
+        /// Resolves column names to their corresponding number (e.g A = 1)
         /// </summary>
         /// <param name="columnName"></param>
         /// <returns></returns>

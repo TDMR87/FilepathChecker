@@ -6,11 +6,11 @@ using System.Threading.Tasks;
 
 namespace FilepathCheckerWPF
 {
-    class RedCross : BaseImage
+    public class Checkmark : BaseImage
     {
         public override string Path()
         {
-            return "Images/Red_cross.png";
+            return "../Images/Green_check.png";
         }
     }
 }

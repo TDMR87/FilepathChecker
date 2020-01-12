@@ -1,9 +1,10 @@
-﻿using Microsoft.Win32;
+﻿using DocumentFormat.OpenXml.Packaging;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,15 +14,15 @@ using System.Windows.Media.Imaging;
 namespace FilepathCheckerWPF
 {
     /// <summary>
-    /// Interaction logic for MainWindow.xaml
+    /// Interaction logic for GUI.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class GUI : Window
     {
         private static CancellationTokenSource cancellationSource = new CancellationTokenSource();
         private static string excelFilepath = "";
         private static string excelFilename = "";
 
-        public MainWindow()
+        public GUI()
         {
             InitializeComponent();
             this.Title = "Filepath Checker";
@@ -120,84 +121,93 @@ namespace FilepathCheckerWPF
             buttonStop.Visibility = Visibility.Visible;
 
             // Objects for transferring information about the progress of the ongoing tasks
-            Progress<ProgressReportModelV2> openFileProcess = new Progress<ProgressReportModelV2>();
-            Progress<ProgressReportModel> processFilepathsProgress = new Progress<ProgressReportModel>();
-            openFileProcess.ProgressChanged += UpdateProgressBar1;
-            processFilepathsProgress.ProgressChanged += UpdateProgressBar2;
+            Progress<ProgressReportModelV2> progressModelV2 = new Progress<ProgressReportModelV2>();
+            Progress<ProgressReportModel> progressModel = new Progress<ProgressReportModel>();
+            progressModelV2.ProgressChanged += UpdateProgressBar1;
+            progressModel.ProgressChanged += UpdateProgressBar2;
 
             // Object for cancelling parallel foreach loops
-            ParallelOptions parallelOptions = new ParallelOptions();
-            parallelOptions.CancellationToken = cancellationSource.Token;
-            parallelOptions.MaxDegreeOfParallelism = System.Environment.ProcessorCount;
+            ParallelOptions cancellationOptions = new ParallelOptions();
+            cancellationOptions.CancellationToken = cancellationSource.Token;
+            cancellationOptions.MaxDegreeOfParallelism = System.Environment.ProcessorCount;
 
-            // Start timing
-            Stopwatch timer = Stopwatch.StartNew();
-
-            // Open the excel-file and start reading the values from the user-specified column
-            labelProgressBar1.Content = "Reading the file ...";
-            List<string> filepaths = await FileProcessor.ReadExcelFileSAXAsync(
-                excelFilepath, 
-                column, 
-                openFileProcess, 
-                parallelOptions)
-                .ConfigureAwait(true);
-
-            // If there was an exception thrown when trying to read the file,
-            // the method returned a string containing an error message.
-            if (filepaths.FirstOrDefault().Contains("File open error"))
+            try
             {
+                // Create a logger and open the Excel spreadsheet.
+                using SpreadsheetDocument spreadsheetDocument = SpreadsheetDocument.Open(excelFilepath, false);
+
+                // Create a file processor
+                FileProcessor fileProcessor = new FileProcessor(spreadsheetDocument, new FileModelV1(), new CsvLogger());
+
+                // Create a timer and start timing
+                Stopwatch timer = Stopwatch.StartNew();
+
+                // Start reading a specific column from the spreadsheet
+                labelProgressBar1.Content = "Reading the file ...";
+                List<string> filepaths = await fileProcessor.ReadColumnSaxAsync(
+                    column,
+                    progressModelV2,
+                    cancellationOptions)
+                    .ConfigureAwait(true);
+
+                // File was read successfully.
+                imageFileReadStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
+
+                labelProgressBar2.Content = "Checking filepaths ..."; // Check if filepaths exist
+                List<IFileModel> processedFilepaths = await fileProcessor.ProcessFilepaths(
+                    filepaths,
+                    progressModel,
+                    cancellationOptions)
+                    .ConfigureAwait(true);
+
+                // Processing done.
+                imageFileExistsStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
+
+                // Stop timing
+                timer.Stop();
+
+                // Get the amount of missing files
+                int missingAmount = (from file in processedFilepaths
+                                     where file.FileExists == false
+                                     select file).Count();
+
+                // Print results to the UI
+                listboxResultsWindow.Items.Add(new ResultMessage
+                {
+                    Content = $"DONE! \n" +
+                    $"Time elapsed: {timer.Elapsed.ToString("hh\\:mm\\:ss", CultureInfo.InvariantCulture)}\n" +
+                    $"Filepaths checked: {processedFilepaths.Count}\n" +
+                    $"Missing files: {missingAmount} \n" +
+                    $"Log file has been created in the application folder."
+                });
+            }
+            catch (Exception ex) when
+            (ex is OpenXmlPackageException
+                || ex is ArgumentException
+                || ex is IOException
+                || ex is FileFormatException)
+            {
+                // Print the exception message to the UI
                 listboxResultsWindow.Items.Add(new ErrorMessage
                 {
-                    Content = filepaths.FirstOrDefault()
+                    Content = ex.Message
                 });
-
-                return;
             }
-
-            // File was read successfully.
-            imageFileReadStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
-
-            // Process the filepaths
-            labelProgressBar2.Content = "Checking filepaths ...";
-            List<IFileModel> processedFilepaths = await FileProcessor.ProcessFilepaths(
-                filepaths, 
-                processFilepathsProgress, 
-                parallelOptions)
-                .ConfigureAwait(true);
-
-            // Processing done.
-            imageFileExistsStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
-
-            // Stop timing
-            timer.Stop();
-
-            // Get the amount of missing files
-            int missingAmount = (from file in processedFilepaths
-                                 where file.FileExists == false
-                                 select file).Count();
-
-            // Print results to the UI
-            listboxResultsWindow.Items.Add(new ResultMessage
+            finally
             {
-                Content = $"DONE! \n" +
-                $"Time elapsed: {timer.Elapsed.ToString("hh\\:mm\\:ss", CultureInfo.InvariantCulture)}\n" +
-                $"Filepaths checked: {processedFilepaths.Count}\n" +
-                $"Missing files: {missingAmount} \n" + 
-                $"Log file has been created in the application folder."
-            });
+                // Go to the last item in the listbox
+                listboxResultsWindow.SelectedIndex = listboxResultsWindow.Items.Count - 1;
+                listboxResultsWindow.ScrollIntoView(listboxResultsWindow.SelectedItem);
 
-            // Go to the last item in the listbox
-            listboxResultsWindow.SelectedIndex = listboxResultsWindow.Items.Count - 1;
-            listboxResultsWindow.ScrollIntoView(listboxResultsWindow.SelectedItem);
+                // Enable/disable UI buttons
+                buttonStart.IsEnabled = true;
+                buttonStop.IsEnabled = false;
+                buttonStart.Visibility = Visibility.Visible;
+                buttonStop.Visibility = Visibility.Hidden;
 
-            // Enable/disable UI buttons
-            buttonStart.IsEnabled = true;
-            buttonStop.IsEnabled = false;
-            buttonStart.Visibility = Visibility.Visible;
-            buttonStop.Visibility = Visibility.Hidden;
-
-            // Release resources (free-up ram)
-            GC.Collect();
+                // Release resources (free-up ram)
+                GC.Collect();
+            }
         }
 
         /// <summary>
