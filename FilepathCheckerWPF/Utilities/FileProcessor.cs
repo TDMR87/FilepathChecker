@@ -6,35 +6,38 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using System.Threading.Tasks;
 using System.Globalization;
+using DocumentFormat.OpenXml;
 
 namespace FilepathCheckerWPF
 {
     public static class FileProcessor
     {
         /// <summary>
-        /// Opens an excel file from the provided filepath using Open XML library. Extracts all the values from the specified column.
+        /// Opens an excel file from the provided filepath using Open XML library. 
+        /// Uses the DOM approach that requires loading entire Open XML parts into memory, 
+        /// which can cause an Out of Memory exception when working with really large files.
         /// </summary>
         /// <param name="filepath"></param>
         /// <param name="columnCharacter"></param>
         /// <param name="progress"></param>
         /// <param name="parallelOptions"></param>
         /// <returns></returns>
-        public static async Task<List<string>> ReadFileUsingOpenXMLAsync(
+        public static async Task<List<string>> ReadExcelFileDOMAsync(
             string filepath,
             string columnCharacter,
             IProgress<ProgressReportModelV2> progress,
             ParallelOptions parallelOptions)
         {
-            List<string> filepaths = new List<string>();
+            List<string> output = new List<string>();
             ProgressReportModelV2 report = new ProgressReportModelV2();
 
             // Start a task in the background that we can cancel using the ParallelOptions cancellation token.
             await Task.Run(() =>
             {
-                // Open a SpreadsheetDocument for read-only access based on a filepath.
                 SpreadsheetDocument spreadsheetDocument;
                 try
                 {
+                    // Open a SpreadsheetDocument in read-only mode.
                     spreadsheetDocument = SpreadsheetDocument.Open(filepath, false);
                 }
                 catch(Exception ex) when (ex is OpenXmlPackageException
@@ -42,14 +45,16 @@ namespace FilepathCheckerWPF
                                         || ex is IOException
                                         || ex is FileFormatException)
                 {
-                    filepaths.Add(ex.Message);
+                    output.Add(ex.Message);
                     return;
                 }
 
                 WorkbookPart workbookPart = spreadsheetDocument.WorkbookPart;
+
+                // Gets the first sheet, index 0
                 Sheet sheet = workbookPart.Workbook
                     .Descendants<Sheet>()
-                    .ElementAt(0); // Get the first sheet, index 0
+                    .ElementAt(0); 
 
                 WorksheetPart worksheetPart = (WorksheetPart)(workbookPart.GetPartById(sheet.Id));
                 SheetData sheetData = worksheetPart.Worksheet.Elements<SheetData>().First();
@@ -57,7 +62,7 @@ namespace FilepathCheckerWPF
                 // Get all the rows in the first sheet
                 List<Row> rows = sheetData.Elements<Row>().ToList();
                 int rowAmount = rows.Count;
-                int rowCounter = 1;
+                int currentRow = 1;
 
                 // Iterate through all the rows
                 foreach (Row row in rows)
@@ -74,14 +79,14 @@ namespace FilepathCheckerWPF
                     // Set the cell name we are looking for in each row.
                     // Concatenates the specified column character with the current row number.
                     // e.g A1, A2, A3 and so on...
-                    string cellName = string.Join("", columnCharacter, rowCounter);
+                    string columnName = string.Join("", columnCharacter, currentRow);
 
                     // Get all cell elements from the row that belong to the specified column
                     // and are of correct datatype
-                    List<Cell> cells = row.Elements<Cell>().Where(cell => 
-                                cell.DataType != null 
+                    List<Cell> cells = row.Elements<Cell>().Where(cell =>
+                                cell.DataType != null
                                 && cell.DataType == CellValues.SharedString
-                                && cell.CellReference.InnerText.Equals(cellName, StringComparison.OrdinalIgnoreCase))
+                                && cell.CellReference.InnerText.Equals(columnName, StringComparison.OrdinalIgnoreCase))
                                 .ToList();
 
                     // Iterate through the cells
@@ -101,20 +106,137 @@ namespace FilepathCheckerWPF
                         // filepaths may be separated with a pipe character
                         foreach (string path in cellValue.Split('|').ToList())
                         {
-                            filepaths.Add(path);
+                            output.Add(path);
                         }
                     }
 
                     // Report progress after each row
-                    report.Filepaths = filepaths;
-                    report.PercentageCompleted = (rowCounter * 100) / rowAmount;
+                    report.Filepaths = output;
+                    report.PercentageCompleted = (currentRow * 100) / rowAmount;
                     progress.Report(report);
 
-                    rowCounter++;
+                    currentRow++;
                 }
             }).ConfigureAwait(false);
 
-            return filepaths;
+            return output;
+        }
+
+        /// <summary>
+        /// Opens an excel file from the provided filepath using Open XML library. 
+        /// Using the SAX approach, you can employ an OpenXMLReader to read the XML in the file one element at a time, 
+        /// without having to load the entire file into memory. Consider using SAX when handling very large files.
+        /// </summary>
+        /// <param name="filepath"></param>
+        /// <param name="columnCharacter"></param>
+        /// <param name="progress"></param>
+        /// <param name="parallelOptions"></param>
+        /// <returns></returns>
+        public static async Task<List<string>> ReadExcelFileSAXAsync(
+            string filepath,
+            string columnCharacter,
+            IProgress<ProgressReportModelV2> progress,
+            ParallelOptions parallelOptions)
+        {
+            List<string> output = new List<string>();
+            ProgressReportModelV2 report = new ProgressReportModelV2();
+
+            await Task.Run(() =>
+            {
+                SpreadsheetDocument spreadsheetDocument;
+                try
+                {
+                    // Open a SpreadsheetDocument in read-only mode.
+                    spreadsheetDocument = SpreadsheetDocument.Open(filepath, false);
+                }
+                catch (Exception ex) when (ex is OpenXmlPackageException
+                                        || ex is ArgumentException
+                                        || ex is IOException
+                                        || ex is FileFormatException)
+                {
+                    output.Add("File open error. " + ex.Message);
+                    return;
+                }
+
+                WorkbookPart workbookPart = spreadsheetDocument.WorkbookPart;
+                WorksheetPart worksheetPart = workbookPart.WorksheetParts.First();
+                OpenXmlReader reader = OpenXmlReader.Create(worksheetPart);
+
+                int totalRows = 0;
+                int currentRow = 1;
+                int sharedStringIndex;
+                string sharedStringValue;
+
+                // Read the file to the end in order to calculate the amount of rows
+                while (reader.Read() && !reader.EOF)
+                {
+                    if (reader.ElementType == typeof(Row))
+                    {
+                        totalRows++;
+                        reader.Skip(); // Skip rest of the elements and read the next row
+                    }
+
+                    try
+                    {
+                        // Cancel task if user pressed stop
+                        parallelOptions.CancellationToken.ThrowIfCancellationRequested();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                }
+
+                // Re-create the reader to start reading from the top again.
+                reader = OpenXmlReader.Create(worksheetPart);
+
+                while (reader.Read())
+                {
+                    // Concatenate a column name
+                    string columnName = string.Join("", columnCharacter, currentRow);
+
+                    // Iterate through the XML elements and find the ones that are of the Cell type
+                    if (reader.ElementType == typeof(Cell))
+                    {
+                        Cell cell = (Cell)reader.LoadCurrentElement();
+
+                        // Last condition checks that the cell is in the user specified column
+                        if (cell.DataType != null
+                            && cell.DataType == CellValues.SharedString
+                            && string.IsNullOrWhiteSpace(cell.InnerText) == false
+                            && cell.CellReference.InnerText.Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            sharedStringIndex = Convert.ToInt32(cell.InnerText, CultureInfo.InvariantCulture);
+                            sharedStringValue = workbookPart.SharedStringTablePart.SharedStringTable
+                                    .Elements<SharedStringItem>()
+                                    .ElementAt(sharedStringIndex).InnerText;
+
+                            output.Add(sharedStringValue);
+                            currentRow++;
+
+                            // Report progress after each row
+                            report.Filepaths = output;
+                            report.PercentageCompleted = (currentRow * 100) / totalRows;
+                            progress.Report(report);
+                        }
+
+                        try
+                        {
+                            // Cancel task if user pressed stop
+                            parallelOptions.CancellationToken.ThrowIfCancellationRequested();
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            return;
+                        }
+                    }
+                }
+
+                reader.Dispose();
+
+            }).ConfigureAwait(false);
+
+            return output;
         }
 
         /// <summary>
@@ -175,7 +297,7 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="filepath"></param>
         /// <returns></returns>
-        public static async Task<IFileModel> CreateFileModelAsync(
+        private static async Task<IFileModel> CreateFileModelAsync(
             string filepath)
         {
             FileModel file = new FileModel();
@@ -197,7 +319,7 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="filepath"></param>
         /// <returns></returns>
-        public static IFileModel CreateFileModel(
+        private static IFileModel CreateFileModel(
             string filepath)
         {
             FileModel file = new FileModel();

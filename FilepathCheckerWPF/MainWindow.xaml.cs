@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,8 +18,8 @@ namespace FilepathCheckerWPF
     public partial class MainWindow : Window
     {
         private static CancellationTokenSource cancellationSource = new CancellationTokenSource();
-        private static string excelFile_Path = "";
-        private static string excelFile_Name = "";
+        private static string excelFilepath = "";
+        private static string excelFilename = "";
 
         public MainWindow()
         {
@@ -27,7 +28,7 @@ namespace FilepathCheckerWPF
         }
 
         /// <summary>
-        /// Starts the open file dialog for opening an Excel-file
+        /// Starts the open-file-dialog and let's the user choose an Excel-file.
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -36,20 +37,20 @@ namespace FilepathCheckerWPF
             OpenFileDialog openFileDialog = new OpenFileDialog();
             if (openFileDialog.ShowDialog() == true)
             {
-                excelFile_Path = openFileDialog.FileName;
+                excelFilepath = openFileDialog.FileName;
 
-                if (!String.IsNullOrWhiteSpace(excelFile_Path))
+                if (!String.IsNullOrWhiteSpace(excelFilepath))
                 {
-                    excelFile_Name = System.IO.Path.GetFileNameWithoutExtension(excelFile_Path);
+                    excelFilename = System.IO.Path.GetFileNameWithoutExtension(excelFilepath);
                 }
 
-                labelSelectedFile.Content = excelFile_Name;
+                labelSelectedFile.Content = excelFilename;
                 buttonStart.IsEnabled = true;
             }
         }
 
         /// <summary>
-        /// Tries to set the cancellation token and resets the application state
+        /// Tries to cancel any ongoing tasks
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -57,7 +58,7 @@ namespace FilepathCheckerWPF
         {
             try
             {
-                // Set cancellation token to cancel any ongoing tasks.
+                // Call cancellation token to cancel any ongoing tasks.
                 cancellationSource.Cancel();
             }
             catch (ObjectDisposedException ex)
@@ -98,14 +99,18 @@ namespace FilepathCheckerWPF
             progressBar1.Value = 0;
             progressBar2.Value = 0;
 
-            // Input check
+            // Check that the user has provided input
             if (String.IsNullOrWhiteSpace(textboxSelectedColumn.Text))
             {
-                MessageBox.Show("Please specify a column.");
+                listboxResultsWindow.Items.Add(new ResultMessage
+                {
+                    Content = "Please specify a column."
+                });
+
                 return;
             }
 
-            // Get the user-specified column letter
+            // Get the column letter that the user specified.
             string column = textboxSelectedColumn.Text.ToUpper(System.Globalization.CultureInfo.InvariantCulture);
 
             // Update UI buttons
@@ -128,21 +133,33 @@ namespace FilepathCheckerWPF
             // Start timing
             Stopwatch timer = Stopwatch.StartNew();
 
-            // Start opening the excel-file and start reading the filepaths from the user-specified column
+            // Open the excel-file and start reading the values from the user-specified column
             labelProgressBar1.Content = "Reading the file ...";
-            List<string> filepaths = await FileProcessor.ReadFileUsingOpenXMLAsync(
-                excelFile_Path, 
+            List<string> filepaths = await FileProcessor.ReadExcelFileSAXAsync(
+                excelFilepath, 
                 column, 
                 openFileProcess, 
                 parallelOptions)
                 .ConfigureAwait(true);
 
-            // File read done.
+            // If there was an exception thrown when trying to read the file,
+            // the method returned a string containing an error message.
+            if (filepaths.FirstOrDefault().Contains("File open error"))
+            {
+                listboxResultsWindow.Items.Add(new ErrorMessage
+                {
+                    Content = filepaths.FirstOrDefault()
+                });
+
+                return;
+            }
+
+            // File was read successfully.
             imageFileReadStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
 
-            // Process the filepaths and resolve them into IFileModel objects
+            // Process the filepaths
             labelProgressBar2.Content = "Checking filepaths ...";
-            List<IFileModel> processedFiles = await FileProcessor.ProcessFilepaths(
+            List<IFileModel> processedFilepaths = await FileProcessor.ProcessFilepaths(
                 filepaths, 
                 processFilepathsProgress, 
                 parallelOptions)
@@ -155,15 +172,17 @@ namespace FilepathCheckerWPF
             timer.Stop();
 
             // Get the amount of missing files
-            int missing = processedFiles.Where(file => !file.FileExists).Count();
+            int missingAmount = (from file in processedFilepaths
+                                 where file.FileExists == false
+                                 select file).Count();
 
             // Print results to the UI
             listboxResultsWindow.Items.Add(new ResultMessage
             {
                 Content = $"DONE! \n" +
-                $"Time elapsed: {timer.Elapsed} ms.\n" +
-                $"Filepaths checked: {filepaths.Count}\n" +
-                $"Missing files: {missing} \n" + 
+                $"Time elapsed: {timer.Elapsed.ToString("hh\\:mm\\:ss", CultureInfo.InvariantCulture)}\n" +
+                $"Filepaths checked: {processedFilepaths.Count}\n" +
+                $"Missing files: {missingAmount} \n" + 
                 $"Log file has been created in the application folder."
             });
 
@@ -177,12 +196,12 @@ namespace FilepathCheckerWPF
             buttonStart.Visibility = Visibility.Visible;
             buttonStop.Visibility = Visibility.Hidden;
 
-            // Release resources (free ram)
+            // Release resources (free-up ram)
             GC.Collect();
         }
 
         /// <summary>
-        /// Updates the progress bar status of reading the Excel-file
+        /// Updates the progress bar when reading the Excel-file
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
@@ -192,7 +211,7 @@ namespace FilepathCheckerWPF
         }
 
         /// <summary>
-        /// Updates the progress bar status of iterating through the extracted filepaths
+        /// Updates the progress bar when checking if the files exist
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
