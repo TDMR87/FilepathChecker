@@ -133,7 +133,8 @@ namespace FilepathCheckerWPF
             await Task.Run(() =>
             {           
                 WorkbookPart workbookPart = _spreadsheetDocument.WorkbookPart;
-                WorksheetPart worksheetPart = workbookPart.WorksheetParts.First();
+                Sheet sheet = workbookPart.Workbook.Descendants<Sheet>().ElementAt(0); // Gets the first sheet, index 0
+                WorksheetPart worksheetPart = (WorksheetPart)(workbookPart.GetPartById(sheet.Id));
                 OpenXmlReader reader = OpenXmlReader.Create(worksheetPart);
 
                 int totalRows = 0;
@@ -167,8 +168,8 @@ namespace FilepathCheckerWPF
 
                 while (reader.Read())
                 {
-                    // Concatenate a column name
-                    string columnName = string.Join("", columnCharacter, currentRow);
+                    // Construct the name of the column we are looking for
+                    string cellName = string.Join("", columnCharacter, currentRow);
 
                     // Iterate through the XML elements and find the ones that are of the Cell type
                     if (reader.ElementType == typeof(Cell))
@@ -176,10 +177,10 @@ namespace FilepathCheckerWPF
                         Cell cell = (Cell)reader.LoadCurrentElement();
 
                         // If cell matches the conditions
-                        if (cell.DataType != null
-                            && cell.DataType == CellValues.SharedString
-                            && string.IsNullOrWhiteSpace(cell.InnerText) == false
-                            && cell.CellReference.InnerText.Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                        if (cell.DataType != null 
+                            && cell.DataType == CellValues.SharedString 
+                            && cell.CellReference.InnerText.Equals(cellName, StringComparison.OrdinalIgnoreCase) 
+                            && !string.IsNullOrWhiteSpace(cell.InnerText))
                         {
                             // The cell value is actually an index to shared string table
                             sharedStringIndex = Convert.ToInt32(cell.InnerText, CultureInfo.InvariantCulture);
