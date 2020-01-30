@@ -7,6 +7,7 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using System.Threading.Tasks;
 using System.Globalization;
 using DocumentFormat.OpenXml;
+using ClosedXML.Excel;
 
 namespace FilepathCheckerWPF
 {
@@ -138,28 +139,35 @@ namespace FilepathCheckerWPF
                 OpenXmlReader reader = OpenXmlReader.Create(worksheetPart);
 
                 int totalRows = 0;
-                
+
                 // Read the file to the end in order to calculate the amount of rows
                 while (reader.Read() && !reader.EOF)
                 {
                     if (reader.ElementType == typeof(Row))
                     {
-                        totalRows++;
-                        reader.Skip(); // Skip rest of the elements and read the next row
-                    }
+                        while (reader.ReadNextSibling())
+                        {
+                            totalRows++;
 
-                    try
-                    {
-                        // Cancel task if user pressed stop
-                        parallelOptions.CancellationToken.ThrowIfCancellationRequested();
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        return;
+                            try
+                            {
+                                // Cancel task if user pressed stop
+                                parallelOptions.CancellationToken.ThrowIfCancellationRequested();
+                            }
+                            catch (OperationCanceledException)
+                            {
+                                return;
+                            }
+                        }
+
+                        // Break from the loop after counting the rows
+                        break;
                     }
                 }
 
                 // Re-create the reader to start reading from the top again.
+                reader.Close();
+                reader.Dispose();
                 reader = OpenXmlReader.Create(worksheetPart);
 
                 int currentRow = 1;
@@ -177,9 +185,9 @@ namespace FilepathCheckerWPF
                         Cell cell = (Cell)reader.LoadCurrentElement();
 
                         // If cell matches the conditions
-                        if (cell.DataType != null 
-                            && cell.DataType == CellValues.SharedString 
-                            && cell.CellReference.InnerText.Equals(cellName, StringComparison.OrdinalIgnoreCase) 
+                        if (cell.DataType != null
+                            && cell.DataType == CellValues.SharedString
+                            && cell.CellReference.InnerText.Equals(cellName, StringComparison.OrdinalIgnoreCase)
                             && !string.IsNullOrWhiteSpace(cell.InnerText))
                         {
                             // The cell value is actually an index to shared string table
@@ -214,6 +222,7 @@ namespace FilepathCheckerWPF
                     }
                 }
 
+                reader.Close();
                 reader.Dispose();
 
             }).ConfigureAwait(false);
@@ -267,6 +276,10 @@ namespace FilepathCheckerWPF
                     progress.Report(report);
                 }
             }).ConfigureAwait(false);
+
+            // Close and dispose the logger after wiriting
+            _logger.Close();
+            _logger.Dispose();
 
             return output;
         }
@@ -326,6 +339,23 @@ namespace FilepathCheckerWPF
             }
 
             return sum;
+        }
+
+        private static int CellReferenceToIndex(Cell cell)
+        {
+            int index = 0;
+            string reference = cell.CellReference.ToString().ToUpper();
+            foreach (char ch in reference)
+            {
+                if (Char.IsLetter(ch))
+                {
+                    int value = (int)ch - (int)'A';
+                    index = (index == 0) ? value : ((index + 1) * 26) + value;
+                }
+                else
+                    return index;
+            }
+            return index;
         }
     }
 }
