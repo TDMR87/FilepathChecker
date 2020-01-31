@@ -198,10 +198,14 @@ namespace FilepathCheckerWPF
                                     .Elements<SharedStringItem>()
                                     .ElementAt(sharedStringIndex).InnerText;
 
-                            // Add the string value to to list
-                            output.Add(sharedStringValue);
+                            // One cell might contain several filepaths separated by a pipe character
+                            foreach (string filepath in sharedStringValue.Split('|').ToList())
+                            {
+                                // Add the filepath to the output list
+                                output.Add(filepath);
+                            }
 
-                            // Report progress for progress bar in the UI
+                            // Report progress after each row
                             report.Filepaths = output;
                             report.PercentageCompleted = (currentRow * 100) / totalRows;
                             progress.Report(report);
