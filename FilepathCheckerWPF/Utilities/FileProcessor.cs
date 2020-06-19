@@ -74,21 +74,24 @@ namespace FilepathCheckerWPF
 
                     // Get all cell elements from the row that belong to the specified column
                     // and are of correct datatype
-                    List<Cell> cells = row.Elements<Cell>().Where(cell =>
-                                cell.DataType != null
-                                && cell.DataType == CellValues.SharedString
-                                && cell.CellReference.InnerText.Equals(columnName, StringComparison.OrdinalIgnoreCase))
-                                .ToList();
+                    List<Cell> cells = row.Elements<Cell>().Where(cell => cell.DataType != null && 
+                                                                  cell.DataType == CellValues.SharedString && 
+                                                                  cell.CellReference.InnerText.Equals(
+                                                                  columnName, 
+                                                                  StringComparison.OrdinalIgnoreCase))
+                                                                  .ToList();
 
                     // Iterate through the cells
                     foreach (Cell cell in cells)
                     {
+                        // The cell value is actually an index to shared string table
+                        int stringId = Convert.ToInt32(cell.InnerText, CultureInfo.InvariantCulture);
+
                         // The cell value is a shared string so use the cell's inner text as the index into the 
                         // shared strings table
-                        int stringId = Convert.ToInt32(cell.InnerText, CultureInfo.InvariantCulture);
                         string cellValue = workbookPart.SharedStringTablePart.SharedStringTable
-                            .Elements<SharedStringItem>()
-                            .ElementAt(stringId).InnerText;
+                                           .Elements<SharedStringItem>()
+                                           .ElementAt(stringId).InnerText;
 
                         // If cell is empty, continue to the next row.
                         if (string.IsNullOrWhiteSpace(cellValue)) { continue; }
@@ -185,18 +188,18 @@ namespace FilepathCheckerWPF
                         Cell cell = (Cell)reader.LoadCurrentElement();
 
                         // If cell matches the conditions
-                        if (cell.DataType != null
-                            && cell.DataType == CellValues.SharedString
-                            && cell.CellReference.InnerText.Equals(cellName, StringComparison.OrdinalIgnoreCase)
-                            && !string.IsNullOrWhiteSpace(cell.InnerText))
+                        if (cell.DataType != null && 
+                            cell.DataType == CellValues.SharedString && 
+                            cell.CellReference.InnerText.Equals(cellName, StringComparison.OrdinalIgnoreCase) && 
+                            !string.IsNullOrWhiteSpace(cell.InnerText))
                         {
                             // The cell value is actually an index to shared string table
                             sharedStringIndex = Convert.ToInt32(cell.InnerText, CultureInfo.InvariantCulture);
 
                             // Get the value in the specified index from the shared string table
                             sharedStringValue = workbookPart.SharedStringTablePart.SharedStringTable
-                                    .Elements<SharedStringItem>()
-                                    .ElementAt(sharedStringIndex).InnerText;
+                                                .Elements<SharedStringItem>()
+                                                .ElementAt(sharedStringIndex).InnerText;
 
                             // One cell might contain several filepaths separated by a pipe character
                             foreach (string filepath in sharedStringValue.Split('|').ToList())
@@ -294,8 +297,7 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="filepath"></param>
         /// <returns></returns>
-        private static async Task<IFileModel> CreateFileModelAsync(
-            string filepath)
+        private static async Task<IFileModel> CreateFileModelAsync(string filepath)
         {
             return await Task<IFileModel>.Run(() =>
             {
@@ -314,8 +316,7 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="filepath"></param>
         /// <returns></returns>
-        private static IFileModel CreateFileModel(
-            string filepath)
+        private static IFileModel CreateFileModel(string filepath)
         {
             return new FileModelV1()
             {
@@ -345,15 +346,21 @@ namespace FilepathCheckerWPF
             return sum;
         }
 
+        /// <summary>
+        /// Resolves a cell reference character to it's index number variant.
+        /// </summary>
+        /// <param name="cell"></param>
+        /// <returns></returns>
         private static int CellReferenceToIndex(Cell cell)
         {
             int index = 0;
-            string reference = cell.CellReference.ToString().ToUpper();
-            foreach (char ch in reference)
+            string cellReference = cell.CellReference.ToString().ToUpper();
+
+            foreach (char character in cellReference)
             {
-                if (Char.IsLetter(ch))
+                if (Char.IsLetter(character))
                 {
-                    int value = (int)ch - (int)'A';
+                    int value = (int)character - (int)'A';
                     index = (index == 0) ? value : ((index + 1) * 26) + value;
                 }
                 else
