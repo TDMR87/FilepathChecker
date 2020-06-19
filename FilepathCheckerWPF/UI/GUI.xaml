@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:FilepathCheckerWPF"
         mc:Ignorable="d"
         Icon="../App_icon.ico"
-        Title="Filepath Checker" Height="450" Width="450" ResizeMode="NoResize">
+        Title="Filepath Checker" Height="450" Width="450" ResizeMode="NoResize" WindowStartupLocation="CenterScreen">
 
     <Grid Margin="20">
         <Grid.RowDefinitions>

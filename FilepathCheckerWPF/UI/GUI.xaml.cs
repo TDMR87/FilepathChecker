@@ -19,6 +19,10 @@ namespace FilepathCheckerWPF
     public partial class GUI : Window
     {
         private static CancellationTokenSource cancellationSource = new CancellationTokenSource();
+        Progress<ProgressReportModelV2> progressModelV2 = new Progress<ProgressReportModelV2>();
+        Progress<ProgressReportModel> progressModel = new Progress<ProgressReportModel>();
+        private static ParallelOptions cancellationOptions;
+        private static List<IFileModel> processedFilepaths;
         private static string excelFilepath = "";
         private static string excelFilename = "";
 
@@ -100,6 +104,9 @@ namespace FilepathCheckerWPF
             progressBar1.Value = 0;
             progressBar2.Value = 0;
 
+            // Create a timer and start timing
+            Stopwatch timer = Stopwatch.StartNew();
+
             // Check that the user has provided input
             if (String.IsNullOrWhiteSpace(textboxSelectedColumn.Text))
             {
@@ -112,7 +119,7 @@ namespace FilepathCheckerWPF
             }
 
             // Get the column letter that the user specified.
-            string column = textboxSelectedColumn.Text.ToUpper(System.Globalization.CultureInfo.InvariantCulture);
+            string column = textboxSelectedColumn.Text.ToUpper(CultureInfo.InvariantCulture);
 
             // Update UI buttons
             buttonStart.IsEnabled = false;
@@ -121,71 +128,50 @@ namespace FilepathCheckerWPF
             buttonStop.Visibility = Visibility.Visible;
 
             // Objects for transferring information about the progress of the ongoing tasks
-            Progress<ProgressReportModelV2> progressModelV2 = new Progress<ProgressReportModelV2>();
-            Progress<ProgressReportModel> progressModel = new Progress<ProgressReportModel>();
             progressModelV2.ProgressChanged += UpdateProgressBar1;
             progressModel.ProgressChanged += UpdateProgressBar2;
 
             // Object for cancelling parallel foreach loops
-            ParallelOptions cancellationOptions = new ParallelOptions();
-            cancellationOptions.CancellationToken = cancellationSource.Token;
-            cancellationOptions.MaxDegreeOfParallelism = System.Environment.ProcessorCount;
+            cancellationOptions = new ParallelOptions
+            {
+                CancellationToken = cancellationSource.Token,
+                MaxDegreeOfParallelism = Environment.ProcessorCount
+            };
 
             try
             {
-                // Create a logger and open the Excel spreadsheet.
+                // Open the Excel spreadsheet.
                 using SpreadsheetDocument spreadsheetDocument = SpreadsheetDocument.Open(excelFilepath, false);
 
                 // Create a file processor
-                FileProcessor fileProcessor = new FileProcessor(spreadsheetDocument, new FileModelV1(), new CsvLogger());
-
-                // Create a timer and start timing
-                Stopwatch timer = Stopwatch.StartNew();
+                FileProcessor fileProcessor = new FileProcessor(spreadsheetDocument, () => new FileModel(), new CsvLogger());
 
                 // Start reading a specific column from the spreadsheet
                 labelProgressBar1.Content = "Reading the file ...";
                 List<string> filepaths = await fileProcessor.ReadColumnSaxAsync(
-                    column,
-                    progressModelV2,
-                    cancellationOptions)
-                    .ConfigureAwait(true);
+                                               column,
+                                               progressModelV2,
+                                               cancellationOptions)
+                                               .ConfigureAwait(true);
 
                 // File was read successfully.
                 imageFileReadStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
 
-                labelProgressBar2.Content = "Checking filepaths ..."; // Check if filepaths exist
-                List<IFileModel> processedFilepaths = await fileProcessor.ProcessFilepaths(
-                    filepaths,
-                    progressModel,
-                    cancellationOptions)
-                    .ConfigureAwait(true);
+                // Process the filepaths
+                labelProgressBar2.Content = "Checking filepaths ...";
+                processedFilepaths = await fileProcessor.ProcessFilepaths(
+                                                            filepaths,
+                                                            progressModel,
+                                                            cancellationOptions)
+                                                            .ConfigureAwait(true);
 
                 // Processing done.
                 imageFileExistsStatus.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
-
-                // Stop timing
-                timer.Stop();
-
-                // Get the amount of missing files
-                int missingAmount = (from file in processedFilepaths
-                                     where file.FileExists == false
-                                     select file).Count();
-
-                // Print results to the UI
-                listboxResultsWindow.Items.Add(new ResultMessage
-                {
-                    Content = $"DONE! \n" +
-                    $"Time elapsed: {timer.Elapsed.ToString("hh\\:mm\\:ss", CultureInfo.InvariantCulture)}\n" +
-                    $"Filepaths checked: {processedFilepaths.Count}\n" +
-                    $"Missing files: {missingAmount} \n" +
-                    $"Log file has been created in the application folder."
-                });
             }
-            catch (Exception ex) when
-            (ex is OpenXmlPackageException
-                || ex is ArgumentException
-                || ex is IOException
-                || ex is FileFormatException)
+            catch (Exception ex) when (ex is OpenXmlPackageException || 
+                                       ex is ArgumentException || 
+                                       ex is IOException || 
+                                       ex is FileFormatException)
             {
                 // Print the exception message to the UI
                 listboxResultsWindow.Items.Add(new ErrorMessage
@@ -204,10 +190,25 @@ namespace FilepathCheckerWPF
                 buttonStop.IsEnabled = false;
                 buttonStart.Visibility = Visibility.Visible;
                 buttonStop.Visibility = Visibility.Hidden;
-
-                // Release resources (free-up ram)
-                //GC.Collect();
             }
+
+            // Stop timing
+            timer.Stop();
+
+            // Get the amount of missing files
+            int missingAmount = (from file in processedFilepaths
+                                 where file.FileExists == false
+                                 select file).Count();
+
+            // Print results to the UI
+            listboxResultsWindow.Items.Add(new ResultMessage
+            {
+                Content = $"DONE! \n" +
+                $"Time elapsed: {timer.Elapsed.ToString("hh\\:mm\\:ss", CultureInfo.InvariantCulture)}\n" +
+                $"Filepaths checked: {processedFilepaths.Count}\n" +
+                $"Missing files: {missingAmount} \n" +
+                $"Log file has been created in the application folder."
+            });
         }
 
         /// <summary>

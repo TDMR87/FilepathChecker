@@ -7,21 +7,21 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using System.Threading.Tasks;
 using System.Globalization;
 using DocumentFormat.OpenXml;
-using ClosedXML.Excel;
+using System.Diagnostics;
 
 namespace FilepathCheckerWPF
 {
     public class FileProcessor
     {
-        private ILogger _logger;
-        private IFileModel _fileModel;
-        private SpreadsheetDocument _spreadsheetDocument;
+        private readonly ILogger _logger;
+        private static Func<IFileModel> _fileModelFactory;
+        private readonly SpreadsheetDocument _spreadsheetDocument;
 
-        public FileProcessor(SpreadsheetDocument spreadsheetDocument, IFileModel fileModel, ILogger logger)
+        public FileProcessor(SpreadsheetDocument spreadsheetDocument, Func<IFileModel> fileModelFactory, ILogger logger)
         {
             _logger = logger;
             _spreadsheetDocument = spreadsheetDocument;
-            _fileModel = fileModel;
+            _fileModelFactory = fileModelFactory;
         }
 
         /// <summary>
@@ -246,7 +246,7 @@ namespace FilepathCheckerWPF
         /// <param name="parallelOptions"></param>
         /// <returns></returns>
         public async Task<List<IFileModel>> ProcessFilepaths(
-            List<string> filepaths, 
+            List<string> filepaths,
             IProgress<ProgressReportModel> progress, 
             ParallelOptions parallelOptions)
         {
@@ -257,7 +257,6 @@ namespace FilepathCheckerWPF
             {
                 foreach (string path in filepaths)
                 {
-                    // Cancel if user presses Stop
                     try
                     {
                         parallelOptions.CancellationToken.ThrowIfCancellationRequested();
@@ -267,15 +266,17 @@ namespace FilepathCheckerWPF
                         return;
                     }
 
-                    // Wrap each filepath into a IFileModel object
-                    IFileModel file = FileProcessor.CreateFileModel(path);
-
-                    // Add the processed file to the output collection
-                    output.Add(file);
+                    // Create a IFileModel object for each filepath
+                    var file = _fileModelFactory();
+                    file.Filepath = path;
+                    file.FileExists = File.Exists(path) ? true : false;
 
                     // If file does not exist, log the filepath.
                     if (file.FileExists == false)
                         _logger.LogFileNotFound(file.Filepath);
+
+                    // Add the file to the output collection
+                    output.Add(file);
 
                     // Report progress after each processed filepath
                     report.FilesProcessed = output;
@@ -289,40 +290,6 @@ namespace FilepathCheckerWPF
             _logger.Dispose();
 
             return output;
-        }
-
-        /// <summary>
-        /// Checks the given UNC filepath and returns a FileModel object. The FileExists property
-        /// will be set to True or False depending if the provided filepath exists or not.
-        /// </summary>
-        /// <param name="filepath"></param>
-        /// <returns></returns>
-        private static async Task<IFileModel> CreateFileModelAsync(string filepath)
-        {
-            return await Task<IFileModel>.Run(() =>
-            {
-                return new FileModelV1()
-                {
-                    Filepath = filepath,
-                    FileExists = File.Exists(filepath) ? true : false
-                };
-
-            }).ConfigureAwait(false);
-        }
-
-        /// <summary>
-        /// Checks the given UNC filepath and returns a FileModel object. The FileExists property
-        /// will be set to True or False depending if the provided filepath exists or not.
-        /// </summary>
-        /// <param name="filepath"></param>
-        /// <returns></returns>
-        private static IFileModel CreateFileModel(string filepath)
-        {
-            return new FileModelV1()
-            {
-                Filepath = filepath,
-                FileExists = File.Exists(filepath) ? true : false
-            };
         }
 
         /// <summary>
