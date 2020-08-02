@@ -273,7 +273,7 @@ namespace FilepathCheckerWPF
 
                     // If file does not exist, log the filepath.
                     if (file.FileExists == false)
-                        _logger.LogFileNotFound(file.Filepath);
+                        _logger.Write($"File not found;{file.Filepath}");
 
                     // Add the file to the output collection
                     output.Add(file);

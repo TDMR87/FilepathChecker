@@ -6,7 +6,7 @@ namespace FilepathCheckerWPF
     {
         void Close();
         void Dispose();
-        void LogFileNotFound(string line);
-        Task LogFileNotFoundAsync(string line);
+        void Write(string line);
+        Task WriteAsync(string line);
     }
 }

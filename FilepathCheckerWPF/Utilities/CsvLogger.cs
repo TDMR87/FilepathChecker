@@ -17,7 +17,8 @@ namespace FilepathCheckerWPF
 
         /// <summary>
         /// Creates an instance of a CSV logger. 
-        /// Instanciating this class creates a log file to the application root folder and writes one initial title line to that file.
+        /// Instanciating this class creates a log file to the application root folder 
+        /// and writes one title line to that file.
         /// </summary>
         public CsvLogger()
         {
@@ -33,11 +34,11 @@ namespace FilepathCheckerWPF
         /// <summary>
         /// Writes a line to the log file asynchronously.
         /// </summary>
-        /// <param name="line"></param>
+        /// <param name="text"></param>
         /// <returns></returns>
-        public async Task LogFileNotFoundAsync(string line)
+        public async Task WriteAsync(string text)
         {
-            await _writer.WriteLineAsync($"File not found;{line}")
+            await _writer.WriteLineAsync($"{text}")
                 .ConfigureAwait(true);
 
             // Not flushing here.
@@ -48,11 +49,11 @@ namespace FilepathCheckerWPF
         /// <summary>
         /// Writes a line to the log file synchronously.
         /// </summary>
-        /// <param name="line"></param>
+        /// <param name="text"></param>
         /// <returns></returns>
-        public void LogFileNotFound(string line)
+        public void Write(string text)
         {
-            _writer.WriteLine($"File not found;{line}");
+            _writer.WriteLine($"{text}");
 
             // Not flushing here.
             // Flushing the buffer after each write makes sense in theory
