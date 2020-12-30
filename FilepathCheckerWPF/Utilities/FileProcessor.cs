@@ -131,36 +131,43 @@ namespace FilepathCheckerWPF
             IProgress<ProgressReportModelV2> progress,
             ParallelOptions parallelOptions)
         {
+            // The output of this method
             List<string> output = new List<string>();
+
+            // Report object
             ProgressReportModelV2 report = new ProgressReportModelV2();
 
+            // Local variables
+            Cell cell;
+            int totalRows = 0;
+            int currentRow = 1;
+            int sharedStringIndex;
+            string sharedStringValue;
+
+            // Start a task
             await Task.Run(() =>
-            {           
+            {     
+                // Open the spreadsheet document
                 WorkbookPart workbookPart = _spreadsheetDocument.WorkbookPart;
                 Sheet sheet = workbookPart.Workbook.Descendants<Sheet>().ElementAt(0); // Gets the first sheet, index 0
                 WorksheetPart worksheetPart = (WorksheetPart)(workbookPart.GetPartById(sheet.Id));
                 OpenXmlReader reader = OpenXmlReader.Create(worksheetPart);
 
-                int totalRows = 0;
-
-                // Read the file to the end in order to calculate the amount of rows
+                // First, we want to calculate the total amount of rows in a SAX way.
+                // We don't want to load all rows into memory and possibly have a OutOfMemoryException.
                 while (reader.Read() && !reader.EOF)
                 {
+                    // If element is type Row
                     if (reader.ElementType == typeof(Row))
                     {
+                        // While the row has sibling rows
                         while (reader.ReadNextSibling())
                         {
+                            // Increment total rows
                             totalRows++;
 
-                            try
-                            {
-                                // Cancel task if user pressed stop
-                                parallelOptions.CancellationToken.ThrowIfCancellationRequested();
-                            }
-                            catch (OperationCanceledException)
-                            {
-                                return;
-                            }
+                            // Cancel task if user pressed stop
+                            parallelOptions.CancellationToken.ThrowIfCancellationRequested();
                         }
 
                         // Break from the loop after counting the rows
@@ -168,32 +175,26 @@ namespace FilepathCheckerWPF
                     }
                 }
 
-                // Re-create the reader to start reading from the top again.
-                reader.Close();
-                reader.Dispose();
+                // Re-open the worksheet to start reading from the beginning
                 reader = OpenXmlReader.Create(worksheetPart);
 
-                int currentRow = 1;
-                int sharedStringIndex;
-                string sharedStringValue;
-
+                // Read all XML elements
                 while (reader.Read())
                 {
-                    // Construct the name of the column we are looking for
-                    string cellName = string.Join("", columnCharacter, currentRow);
+                    // Throw if cancelled
+                    parallelOptions.CancellationToken.ThrowIfCancellationRequested();
 
-                    // Iterate through the XML elements and find the ones that are of the Cell type
+                    // If the XML element is of type Cell
                     if (reader.ElementType == typeof(Cell))
                     {
-                        Cell cell = (Cell)reader.LoadCurrentElement();
+                        // Load the cell
+                        cell = reader.LoadCurrentElement() as Cell;
 
-                        // If cell matches the conditions
-                        if (cell.DataType != null && 
-                            cell.DataType == CellValues.SharedString && 
-                            cell.CellReference.InnerText.Equals(cellName, StringComparison.OrdinalIgnoreCase) && 
-                            !string.IsNullOrWhiteSpace(cell.InnerText))
+                        // If cell matches the following conditions
+                        if (cell.DataType == CellValues.SharedString &&
+                            CellReferenceToColumnName(cell.CellReference.Value).Equals(columnCharacter, StringComparison.OrdinalIgnoreCase))
                         {
-                            // The cell value is actually an index to shared string table
+                            // The cell value is an index to shared string table
                             sharedStringIndex = Convert.ToInt32(cell.InnerText, CultureInfo.InvariantCulture);
 
                             // Get the value in the specified index from the shared string table
@@ -202,7 +203,7 @@ namespace FilepathCheckerWPF
                                                 .ElementAt(sharedStringIndex).InnerText;
 
                             // One cell might contain several filepaths separated by a pipe character
-                            foreach (string filepath in sharedStringValue.Split('|').ToList())
+                            foreach (string filepath in sharedStringValue.Split('|'))
                             {
                                 // Add the filepath to the output list
                                 output.Add(filepath);
@@ -212,23 +213,11 @@ namespace FilepathCheckerWPF
                             report.Filepaths = output;
                             report.PercentageCompleted = (currentRow * 100) / totalRows;
                             progress.Report(report);
-
-                            // We found what we wanted from the current row. Move to next row
-                            currentRow++;
-                        }
-
-                        try
-                        {
-                            // Cancel task if user pressed stop
-                            parallelOptions.CancellationToken.ThrowIfCancellationRequested();
-                        }
-                        catch (OperationCanceledException)
-                        {
-                            return;
                         }
                     }
                 }
 
+                // Cleanup
                 reader.Close();
                 reader.Dispose();
 
@@ -334,6 +323,31 @@ namespace FilepathCheckerWPF
                     return index;
             }
             return index;
+        }
+
+        /// <summary>
+        /// Returns the alphabetical letter porsion of a cell reference value.
+        /// For example, an input of "A1" returns "A".
+        /// </summary>
+        /// <param name="text"></param>
+        /// <returns></returns>
+        public static string CellReferenceToColumnName(string text)
+        {
+            string output = "";
+
+            char[] chars = text?.ToCharArray();
+
+            foreach (char c in chars)
+            {
+                if (Char.IsNumber(c))
+                {
+                    break;
+                }
+
+                output += c;
+            }
+
+            return output;
         }
     }
 }
