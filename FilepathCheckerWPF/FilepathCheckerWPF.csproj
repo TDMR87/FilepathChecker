@@ -102,7 +102,7 @@
     <Compile Include="Models\MessageModels\ResultMessage.cs" />
     <Compile Include="Utilities\FileProcessor.cs" />
     <Compile Include="Utilities\CsvLogger.cs" />
-    <Compile Include="Interfaces\IFileModel.cs" />
+    <Compile Include="Interfaces\IFileWrapper.cs" />
     <Compile Include="Models\ProgressModels\ProgressDataModel.cs" />
     <Compile Include="Interfaces\ILogger.cs" />
     <Page Include="UI\GUI.xaml">
@@ -115,7 +115,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Models\FileModels\FileModel.cs" />
+    <Compile Include="Models\FileWrappers\FileWrapper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs">
       <SubType>Code</SubType>
     </Compile>

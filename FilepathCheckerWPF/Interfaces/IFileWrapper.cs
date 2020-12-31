@@ -1,6 +1,6 @@
 ﻿namespace FilepathCheckerWPF
 {
-    public interface IFileModel
+    public interface IFileWrapper
     {
         bool FileExists { get; set; }
         string Filepath { get; set; }
