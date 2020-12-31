@@ -1,9 +1,9 @@
-# FilepathChecker
-A tool for reading large lists of filepaths in an **.xlsx** file and checking if the filepaths exist.
+# Filepath Validator
+A tool for reading large lists of filepaths in a **.xlsx** file and checking if the filepaths exist.
 
 Using this tool you can read an Excel spreadsheet that has filepaths in a specific column. Thousands of rows can be processed with this tool without using much of your systems RAM.
 
-The tool utilises a SAX approach for reading the spreadsheet. Using the SAX approach, you can employ an OpenXMLReader to read the XML in the file one element at a time, without having to load the entire file into memory.
+The tool utilises a SAX approach for reading the spreadsheet. Using the SAX approach, OpenXMLReader reads the XML in the file one element at a time, without having to load the entire file into memory.
 
 https://docs.microsoft.com/en-us/office/open-xml/how-to-parse-and-read-a-large-spreadsheet
 
