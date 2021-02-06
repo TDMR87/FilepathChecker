@@ -9,7 +9,7 @@ namespace FilepathCheckerWPF
     // you should create a `protected virtual void Dispose(bool disposing)` method.
     public sealed class CsvLogger : IDisposable, ILogger
     {
-        private StreamWriter _writer;
+        private readonly StreamWriter _writer;
         private static string _fileDirectory = "";
         private static string _fileName = "";
         private static string _fileExtension = "";
@@ -26,7 +26,6 @@ namespace FilepathCheckerWPF
             _fileName = $"ERRORS {DateTime.Now.ToString("MM-dd-yyyy HH-mm-ss", CultureInfo.InvariantCulture)}";
             _fileExtension = ".csv";
             _titleRow = "Error;Filepath";
-
             _writer = new StreamWriter(Path.Combine(_fileDirectory, (_fileName + _fileExtension)));
             _writer.WriteLine(_titleRow);
         }

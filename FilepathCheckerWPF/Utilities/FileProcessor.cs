@@ -12,6 +12,9 @@ using System.Diagnostics;
 
 namespace FilepathCheckerWPF
 {
+    /// <summary>
+    /// A type that processes excel files.
+    /// </summary>
     public class ExcelFileProcessor
     {
         private readonly ILogger _logger;
@@ -44,13 +47,13 @@ namespace FilepathCheckerWPF
         /// <param name="progress"></param>
         /// <param name="parallelOptions"></param>
         /// <returns></returns>
-        public async Task<List<string>> ReadColumnSax(
+        public List<string> ReadColumnSax(
             string columnCharacter,
-            IProgress<ProgressStatus> progress,
-            CancellationToken ct)
+            IProgress<FileProgressInfo> progress = null,
+            CancellationToken ct = default)
         {
             var output = new List<string>();
-            var status = new ProgressStatus();
+            var status = new FileProgressInfo();
             Cell cell;
             int totalRows = 0;
             int currentRow = 1;
@@ -120,12 +123,15 @@ namespace FilepathCheckerWPF
                         }
 
                         // Assume that each time we hit this part of code,
-                        // we are on a new row.
+                        // we should go to next row.
                         currentRow++;
 
-                        // Report progress
-                        status.PercentageCompleted = (currentRow * 100) / totalRows;
-                        progress.Report(status);
+                        // Report progress?
+                        if (progress != null)
+                        {
+                            status.PercentageCompleted = (currentRow * 100) / totalRows;
+                            progress.Report(status);
+                        }
                     }
                 }
             }
@@ -137,19 +143,20 @@ namespace FilepathCheckerWPF
         }
 
         /// <summary>
-        /// Takes a list of filepaths and wraps each filepath into an IFileModel object. 
+        /// Takes a list of filepaths as strings and wraps each one into an IFileModel object,
+        /// which holds information if the file exists or not. 
         /// Returns the objects as a List.
         /// </summary>
         /// <param name="filepaths"></param>
         /// <param name="progress"></param>
         /// <param name="parallelOptions"></param>
         /// <returns></returns>
-        public async Task<List<IFileWrapper>> ProcessFilepaths(
+        public List<IFileWrapper> ProcessFilepaths(
             List<string> filepaths,
-            IProgress<ProgressStatus> progress, 
+            IProgress<FileProgressInfo> progress, 
             CancellationToken ct)
         {
-            var status = new ProgressStatus();
+            var status = new FileProgressInfo();
             var output = new List<IFileWrapper>();
 
             foreach (string path in filepaths)

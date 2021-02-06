@@ -20,14 +20,14 @@ namespace FilepathCheckerWPF
     {
         private static CancellationTokenSource cancellationSource = new CancellationTokenSource();
         private static List<IFileWrapper> processedFilepaths = new List<IFileWrapper>();
+        private static List<string> filepaths;
         private static string excelFilepath = "";
-        private static string excelFilename = "";
 
         public GUI()
         {
             InitializeComponent();
             Title = "Filepath Validator";
-            PrintMessage("Open a .xlsx file and specify a column that contains local filepaths.\n" +
+            PrintMessage("Open a .xlsx file and specify a column that contains filepaths.\n" +
                          "The program performs a check for each filepath to see if the file exists.");
         }
 
@@ -38,24 +38,20 @@ namespace FilepathCheckerWPF
         /// <param name="e"></param>
         private async void Start_Clicked(object sender, RoutedEventArgs e)
         {
+            // If user did not provide input
+            if (string.IsNullOrWhiteSpace(textboxSelectedColumn.Text))
+            {
+                PrintMessage("You must specify a column.");
+                return;
+            }
+
             // Reset the application state
             ResetAppState();
 
-            // If user did not provide input
-            if (string.IsNullOrWhiteSpace(textboxSelectedColumn.Text))
-                PrintMessage("You must specify a column.");
-
             // The user specified column letter
-            string column =
-                textboxSelectedColumn.Text.ToUpper(CultureInfo.InvariantCulture);
+            string column = textboxSelectedColumn.Text.ToUpper(CultureInfo.InvariantCulture);
 
-            // Update UI buttons
-            buttonStart.IsEnabled = false;
-            buttonStop.IsEnabled = true;
-            buttonStart.Visibility = Visibility.Hidden;
-            buttonStop.Visibility = Visibility.Visible;
-
-            // Create a timer and start timing
+            // Create a timer and start it
             var timer = Stopwatch.StartNew();
 
             try
@@ -69,51 +65,60 @@ namespace FilepathCheckerWPF
                     new ExcelFileProcessor(excelFile,
                         () => new FileWrapper(), new CsvLogger());
 
-                // Update status label
-                labelProgressBar1.Content = "Reading the file ...";
-
-                // Create an object for reporting progress from a background task
-                var progressReport = new Progress<ProgressStatus>();
-
-                // Add a callback for the progress report
+                // Create an object for reporting progress
+                // and set the callback.
+                var progressReport = new Progress<FileProgressInfo>();
                 progressReport.ProgressChanged += UpdateProgressBar1;
 
-                // Create a task that reads values in the specified column
-                var task1 = Task.Run(() => 
+                // Create and run a task that reads the file
+                var readTask = Task.Run(() => 
                     fileProcessor.ReadColumnSax(
                         column, progressReport, cancellationSource.Token), 
                             cancellationSource.Token);
-                
-                // Run the task
-                List<string> filepaths = await task1;
 
-                // If task was completed
-                if (task1.IsCompleted)
-                    imageFileReadStatus.Source =
-                        new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
+                // Update progress bar label
+                labelProgressBar1.Content = "Reading the file ...";
 
-                // Update status label
-                labelProgressBar2.Content = "Validating filepaths ...";
+                // Await the task's result, catching cancellation exception
+                try
+                {
+                    filepaths = await readTask.ConfigureAwait(true);
+                }
+                catch (OperationCanceledException ex)
+                {
+                    PrintMessage(ex.Message);
+                }
 
-                // Remove previous callback from the progress report
+                // If task was completed, update image
+                if (readTask.IsCompleted)
+                    image1.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
+
+                // Remove previous callback and add a new one.
                 progressReport.ProgressChanged -= UpdateProgressBar1;
-
-                // Add a new callback to the progress report
                 progressReport.ProgressChanged += UpdateProgressBar2;
 
-                // Create a task that processes the filepaths
+                // Run a task that processes the filepaths
                 var task2 = Task.Run(() => 
                     fileProcessor.ProcessFilepaths(
                         filepaths, progressReport, cancellationSource.Token), 
                             cancellationSource.Token);
 
-                // Run the task
-                processedFilepaths = await task2;
+                // Update progress bar label
+                labelProgressBar2.Content = "Validating filepaths ...";
 
-                // If task was completed
+                // Await the task's result, catching cancellation exception
+                try
+                {
+                    processedFilepaths = await task2.ConfigureAwait(true);
+                }
+                catch (OperationCanceledException ex)
+                {
+                    PrintMessage(ex.Message);
+                }
+
+                // If task was completed, update image
                 if (task2.IsCompleted)
-                    imageFileExistsStatus.Source =
-                        new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
+                    image2.Source = new BitmapImage(new Uri(new Checkmark().Path(), UriKind.Relative));
             }
             catch (Exception ex) when (ex is OpenXmlPackageException ||
                                        ex is ArgumentException ||
@@ -121,6 +126,7 @@ namespace FilepathCheckerWPF
                                        ex is FileFormatException ||
                                        ex is OperationCanceledException)
             {
+                // Display the error
                 PrintMessage(ex.Message);
             }
             finally
@@ -159,23 +165,25 @@ namespace FilepathCheckerWPF
         /// <param name="e"></param>
         private void OpenFile_Clicked(object sender, RoutedEventArgs e)
         {
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "Excel files (.xlsx)|*.xlsx";
+            OpenFileDialog openFileDialog = new OpenFileDialog
+            {
+                Filter = "Excel files (.xlsx)|*.xlsx"
+            };
 
+            // If user pressed OK
             if (openFileDialog.ShowDialog() == true)
             {
+                // Save the filepath to a private variable
                 excelFilepath = openFileDialog.FileName;
 
                 if (!string.IsNullOrWhiteSpace(excelFilepath))
                 {
-                    excelFilename = Path.GetFileNameWithoutExtension(excelFilepath);
+                    // Show filename on the UI
+                    labelSelectedFile.Content = Path.GetFileNameWithoutExtension(excelFilepath);
+
+                    // Enable Start button
+                    buttonStart.IsEnabled = true;
                 }
-
-                // Show filename on the UI
-                labelSelectedFile.Content = excelFilename;
-
-                // Enable Start button
-                buttonStart.IsEnabled = true;
             }
         }
 
@@ -188,7 +196,7 @@ namespace FilepathCheckerWPF
         {
             try
             {
-                // Call cancellation token to cancel any ongoing tasks.
+                // Call cancellation source to cancel any ongoing tasks
                 cancellationSource.Cancel();
             }
             catch (ObjectDisposedException ex)
@@ -202,7 +210,7 @@ namespace FilepathCheckerWPF
             {
                 listboxResultsWindow.Items.Add(new ResultMessage
                 {
-                    Content = ex.Message
+                    Content = ex.InnerException.Message
                 });
             }
             finally
@@ -220,7 +228,7 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void UpdateProgressBar2(object sender, ProgressStatus e)
+        private void UpdateProgressBar2(object sender, FileProgressInfo e)
         {
             progressBar2.Value = e.PercentageCompleted;
         }
@@ -230,7 +238,7 @@ namespace FilepathCheckerWPF
         /// </summary>
         /// <param name="sender"></param>
         /// <param name="e"></param>
-        private void UpdateProgressBar1(object sender, ProgressStatus e)
+        private void UpdateProgressBar1(object sender, FileProgressInfo e)
         {
             progressBar1.Value = e.PercentageCompleted;
         }
@@ -248,19 +256,24 @@ namespace FilepathCheckerWPF
         }
 
         /// <summary>
-        /// Resets the state of the application
+        /// Resets the state of the application.
         /// </summary>
         private void ResetAppState()
         {
+            buttonStart.IsEnabled = false;
+            buttonStop.IsEnabled = true;
+            buttonStart.Visibility = Visibility.Hidden;
+            buttonStop.Visibility = Visibility.Visible;
             cancellationSource = new CancellationTokenSource();
+            filepaths.Clear();
             processedFilepaths.Clear();
             listboxResultsWindow.Items.Clear();
             labelProgressBar1.Content = "";
             labelProgressBar2.Content = "";
             progressBar1.Value = 0;
             progressBar2.Value = 0;
-            imageFileExistsStatus.Source = new BitmapImage(new Uri(new RedCross().Path(), UriKind.Relative));
-            imageFileReadStatus.Source = new BitmapImage(new Uri(new RedCross().Path(), UriKind.Relative));
+            image2.Source = new BitmapImage(new Uri(new RedCross().Path(), UriKind.Relative));
+            image1.Source = new BitmapImage(new Uri(new RedCross().Path(), UriKind.Relative));
         }
     }
 }

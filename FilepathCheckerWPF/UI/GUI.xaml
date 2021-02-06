@@ -126,14 +126,14 @@
             Grid.Row="3"/>
 
         <Image 
-            Name="imageFileReadStatus"
+            Name="image1"
             Source="../Images/Red_cross.png"
             Grid.Row="2"
             Width="18"
             HorizontalAlignment="Right" Margin="0,0,3.2,0.4"/>
 
         <Image 
-            Name="imageFileExistsStatus"
+            Name="image2"
             Source="../Images/Red_cross.png"
             Grid.Row="2"
             Width="18"

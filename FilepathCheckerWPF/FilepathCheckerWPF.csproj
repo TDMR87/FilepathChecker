@@ -118,7 +118,7 @@
     <Compile Include="Utilities\FileProcessor.cs" />
     <Compile Include="Utilities\CsvLogger.cs" />
     <Compile Include="Interfaces\IFileWrapper.cs" />
-    <Compile Include="Models\ProgressModels\ProgressDataModel.cs" />
+    <Compile Include="Models\ProgressModels\FileProgressInfo.cs" />
     <Compile Include="Interfaces\ILogger.cs" />
     <Page Include="UI\GUI.xaml">
       <SubType>Designer</SubType>
