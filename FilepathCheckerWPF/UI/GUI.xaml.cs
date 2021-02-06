@@ -19,7 +19,7 @@ namespace FilepathCheckerWPF
     public partial class GUI : Window
     {
         private static CancellationTokenSource cancellationSource = new CancellationTokenSource();
-        private static List<IFileWrapper> processedFilepaths = new List<IFileWrapper>();
+        private static List<IFileWrapper> processedFilepaths;
         private static List<string> filepaths;
         private static string excelFilepath = "";
 
@@ -265,8 +265,8 @@ namespace FilepathCheckerWPF
             buttonStart.Visibility = Visibility.Hidden;
             buttonStop.Visibility = Visibility.Visible;
             cancellationSource = new CancellationTokenSource();
-            filepaths.Clear();
-            processedFilepaths.Clear();
+            filepaths?.Clear();
+            processedFilepaths?.Clear();
             listboxResultsWindow.Items.Clear();
             labelProgressBar1.Content = "";
             labelProgressBar2.Content = "";
