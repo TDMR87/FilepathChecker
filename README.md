@@ -1,5 +1,5 @@
 # Filepath Validator
-A tool for validating a large list of filepaths in a **.xlsx** file.
+A tool for mass validating large list of filepaths.
 
 Using this tool you can read an Excel spreadsheet that has filepaths in a specific column. Thousands of rows can be processed with this tool without using much of your systems RAM.
 
